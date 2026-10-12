@@ -10,6 +10,27 @@ from zen_creator import Attribute, Element, SourceInformation, Technology
 from zen_creator.datasets.datasets.dataset import Dataset
 from zen_creator.datasets.datasets.metadata import MetaData
 
+# industry heat technologies, which diffuse as the district heating technologies
+_INDUSTRY_SECTORS = ["glass", "ceramic", "paper", "food"]
+_INDUSTRY_HEAT_TECHNOLOGIES = [
+    *[
+        f"{fuel}_boiler_industry_{sector}"
+        for fuel in ["biomass", "natural_gas", "electrode", "oil", "coal", "waste"]
+        for sector in _INDUSTRY_SECTORS
+    ],
+    *[
+        f"heat_pump_industry_{level}_{source}_{sector}"
+        for level in ["0_100", "100_150", "150_200"]
+        for source in ["waste_heat", "water"]
+        for sector in _INDUSTRY_SECTORS
+    ],
+    *[
+        f"{fuel}_to_kilnfuel_{sector}"
+        for fuel in ["hydrogen", "electricity"]
+        for sector in ["glass", "ceramic"]
+    ],
+]
+
 
 class TechnologyDiffusionMannhardt(Dataset[pd.DataFrame]):
     """
@@ -115,6 +136,7 @@ class TechnologyDiffusionMannhardt(Dataset[pd.DataFrame]):
         "oil_to_gasoline_conversion",
         "oil_to_diesel_conversion",
         "oil_to_kerosene_conversion",
+        *_INDUSTRY_HEAT_TECHNOLOGIES,
     ]
     HIGH = [
         "photovoltaics",

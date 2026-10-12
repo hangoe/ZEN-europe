@@ -6,6 +6,7 @@ from .cache import CacheSettings  # noqa: F401
 from .cost import CostSettings  # noqa: F401
 from .data_source import DataSourceSettings  # noqa: F401
 from .emissions import EmissionsSettings  # noqa: F401
+from .industry import IndustrySettings  # noqa: F401
 from .investment import InvestmentSettings  # noqa: F401
 from .max_load import MaxLoadSettings  # noqa: F401
 from .region import RegionSettings  # noqa: F401
@@ -16,6 +17,7 @@ from .time import TimeSettings  # noqa: F401
 __all__ = [
     "TimeSettings",
     "InvestmentSettings",
+    "IndustrySettings",
     "CostSettings",
     "EmissionsSettings",
     "DataSourceSettings",

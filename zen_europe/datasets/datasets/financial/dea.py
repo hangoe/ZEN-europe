@@ -117,12 +117,13 @@ _CCS_SCENARIOS = {"min": "Lower", "max": "Upper", "ref": "Est"}
 # ens.dk/sites/ens.dk/files/... URLs no longer resolve), and the local filename each is cached
 # under on first load (matching the other agencies' checked-in-raw-file convention). Each
 # workbook contains an "alldata_flat" sheet.
-_SOURCES: dict[str, tuple[str, str]] = {
+_SOURCES: dict[str, tuple[str, str | None]] = {
     "main": ("technology_data_for_el_and_dh.xlsx", "https://ens.dk/media/8615/download"),
     "ih": ("technology_data_heating_installations.xlsx", "https://ens.dk/media/8518/download"),
     "rf": ("data_sheets_for_renewable_fuels.xlsx", "https://ens.dk/media/6444/download"),
     "ccs": ("technology_data_for_carbon_capture_transport_storage.xlsx", "https://ens.dk/media/5729/download"),
     "dh_transport": ("technology_data_for_energy_transport.xlsx", "https://ens.dk/media/7681/download"),
+    "ph": ("technology_data_for_industrial_process_heat.xlsx", "https://ens.dk/en/analyses-and-statistics/technology-data-industrial-process-heat"),
 }
 
 # `ws`-sheet name (within the energy-transport workbook's `alldata_flat`) for each district
@@ -261,6 +262,41 @@ _RF_ALT_SCENARIO_TECHS = {"anaerobic_digestion", "biomethane_conversion"}
 _RF_MONEY_YEAR_SRC: dict[str, int] = {"pyrolysis": 2025}
 _RF_DEFAULT_MONEY_YEAR_SRC = 2020
 
+# internal technology name -> `ws`-sheet name in the industrial-process-heat workbook. The gas
+# and oil boiler share one DEA sheet. Costs are (par_string, multiplier_to_schema_unit), since
+# the par labels differ between the sheets.
+_PH_TECHS: dict[str, str] = {
+    "heat_pump_industry_125": "2.a High temp. hp Up to 125C",
+    "heat_pump_industry_150": "2.b High temp. hp Up to 150",
+    "electrode_boiler_industry": "5.1a Electric boiler steam",
+    "natural_gas_boiler_industry": "6.1 Boiler, gas and oil",
+    "oil_boiler_industry": "6.1 Boiler, gas and oil",
+    "biomass_boiler_industry": "6.2 Boiler, biomass",
+    "coal_boiler_industry": "6.3 Boiler, coal",
+}
+_PH_COST_PARS_DEFAULT: dict[str, tuple[str, float]] = {
+    "capex": ("Nominal investment (*total) [MEUR/MW]", 1000.0),
+    "fopex": ("Fixed O&M  [EUR/MW_y]", 1 / 1000),
+    "vopex": ("Variable O&M [EUR/MWh]", 1.0),
+}
+_PH_COST_PARS: dict[str, dict[str, tuple[str, float]]] = {
+    "heat_pump_industry_150": {
+        "capex": ("Nominal investment (*total) [MEUR/MW]", 1000.0),
+        "fopex": ("Fixed O&M  [EUR/MW_y], from last update in 2019", 1 / 1000),
+        "vopex": ("Variable O&M [EUR/MWh], from last update in 2019", 1.0),
+    },
+    "electrode_boiler_industry": {
+        "capex": ("Nominal investment [M€/MW]", 1000.0),
+        "fopex": ("Fixed O&M [€/MJ/s/year]", 1 / 1000),  # MJ/s = MW
+        "vopex": ("Variable O&M [€/MWh]", 1.0),
+    },
+}
+# only the boilers; the heat pumps' nominal-load COP is given per temperature lift instead
+_PH_EFFICIENCY_PAR = "Total efficiency, net [%], nominel load"
+# The workbook's `priceyear` column is blank for some sheets; its Index sheet states "All cost
+# data is in 2025€".
+_PH_MONEY_YEAR_SRC = 2025
+
 
 def _dea_size(plant_size: str, technology: str) -> str:
     return _SIZE_MAP_PV[plant_size] if technology in _PV_TECHS else _SIZE_MAP[plant_size]
@@ -310,8 +346,9 @@ class DEA(Dataset[pd.DataFrame]):
     """Danish Energy Agency (DEA) technology catalogue cost data.
 
     Covers utility-scale power/district-heating technologies, individual
-    (residential) heating installations, carbon-capture technologies, and
-    renewable-fuel production routes.
+    (residential) heating installations, carbon-capture technologies,
+    renewable-fuel production routes, and industrial process heat (boilers and
+    high-temperature heat pumps).
 
     Carbon-capture technologies are reported on a Euro/tCO2(/h) basis rather
     than Euro/kW; their rows carry `CO2_BASIS_UNITS` in the `unit` column
@@ -371,12 +408,14 @@ class DEA(Dataset[pd.DataFrame]):
         ih_financial, ih_technical = self._load("ih")
         ccs_financial, ccs_technical = self._load("ccs")
         rf_financial, rf_technical = self._load("rf", rf_category_fixup=True)
+        ph_financial, ph_technical = self._load("ph", rf_category_fixup=True)
 
         rows: list[tuple] = []
         rows += self._parse_main(financial, technical)
         rows += self._parse_individual_heating(ih_financial, ih_technical)
         rows += self._parse_ccs(ccs_financial, ccs_technical)
         rows += self._parse_renewable_fuels(rf_financial, rf_technical)
+        rows += self._parse_process_heat(ph_financial, ph_technical)
 
         data = pd.DataFrame(rows, columns=INDEX_NAMES + VALUE_COLUMNS)
         data = data.drop_duplicates(subset=INDEX_NAMES)
@@ -392,11 +431,13 @@ class DEA(Dataset[pd.DataFrame]):
         `cat` column into "Financial data" and "Energy/technical data". The renewable-fuels
         workbook's `cat` column has several whitespace-inconsistent "Financial data..." variants
         (`rf_category_fixup=True` normalizes them to "Financial data", exactly as the legacy
-        script did); every other source uses `cat` values that already match exactly.
+        script did); the same holds for the industrial-process-heat workbook.
         """
         filename, url = _SOURCES[source]
         file_path = self.path / filename
         if not file_path.exists():
+            if url is None:
+                raise FileNotFoundError(f"DEA source workbook {file_path} is missing.")
             self._download(url, file_path)
         raw = pd.read_excel(file_path, sheet_name="alldata_flat")
         if rf_category_fixup:
@@ -665,6 +706,39 @@ class DEA(Dataset[pd.DataFrame]):
                             )
                         )
             rows += self._parse_lifetime_and_construction_time(tech_rows, technology, "M", scenarios)
+        return rows
+
+    def _parse_process_heat(self, financial: pd.DataFrame, technical: pd.DataFrame) -> list[tuple]:
+        """Fills the industrial boiler and high-temperature heat pump rows.
+
+        The rows are selected by `ws` sheet, as the `Technology` labels repeat across sheets.
+        The efficiency is labelled "[%]" but reported as a fraction.
+        """
+        rows: list[tuple] = []
+        schema_units = {"capex": "Euro/kW", "fopex": "Euro/kW", "vopex": "Euro/MWh"}
+        for technology, ws in _PH_TECHS.items():
+            fin_rows = financial[financial["ws"] == ws]
+            tech_rows = technical[technical["ws"] == ws]
+            for scenario, est in _SCENARIOS.items():
+                for variable, (par, multiplier) in _PH_COST_PARS.get(technology, _PH_COST_PARS_DEFAULT).items():
+                    sel = fin_rows[(fin_rows["par"] == par) & (fin_rows["est"] == est)]
+                    for _, row in sel.iterrows():
+                        rows.append(
+                            (
+                                technology, "M", scenario, variable, int(row["year"]),
+                                float(row["val"]) * multiplier, schema_units[variable],
+                                _PH_MONEY_YEAR_SRC, float(row["val"]), row["unit"],
+                            )
+                        )
+                sel = tech_rows[(tech_rows["par"] == _PH_EFFICIENCY_PAR) & (tech_rows["est"] == est)]
+                for _, row in sel.iterrows():
+                    rows.append(
+                        (
+                            technology, "M", scenario, "efficiency", int(row["year"]),
+                            float(row["val"]), "1", None, float(row["val"]), row["unit"],
+                        )
+                    )
+            rows += self._parse_lifetime_and_construction_time(tech_rows, technology, "M", _SCENARIOS)
         return rows
 
     @staticmethod

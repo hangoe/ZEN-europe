@@ -13,3 +13,6 @@ from .refining import RefiningSector
 from .shipping import ShippingSector
 from .steel import SteelSector
 from .truck_transport import TruckTransportSector
+from .industry_dsm import IndustryDSMSector
+from .industry_heat import IndustryHeatSector
+from .industry_tes import IndustryTESSector
