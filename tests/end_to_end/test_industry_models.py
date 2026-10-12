@@ -19,7 +19,7 @@ def _create(name: str) -> Model:
 
 @pytest.fixture(scope="module")
 def full() -> Model:
-    return _create("zen_europe_ind_heat_v1")
+    return _create("zen_europe_ind_heat_v1_full_flexibility")
 
 
 def test_elements_per_sector(full: Model) -> None:
@@ -41,6 +41,14 @@ def test_elements_per_sector(full: Model) -> None:
     assert {"glass_post_comb", "ceramic_post_comb", "clinker_DSM"} <= names
 
 
+def test_base() -> None:
+    model = _create("zen_europe_base")
+    assert not any(
+        any(sector in n for sector in SECTORS) or "TES" in n or n.endswith("_DSM")
+        for n in model.elements
+    )
+
+
 def test_no_flexibility_and_no_diffusion() -> None:
     model = _create("zen_europe_ind_heat_v1_no_flexibility_nodiffusion")
     assert not any("TES" in n or n.endswith("_DSM") for n in model.elements)
@@ -49,7 +57,7 @@ def test_no_flexibility_and_no_diffusion() -> None:
 
 
 def test_single_temperature_level() -> None:
-    model = _create("zen_europe_ind_heat_v1_single_temp")
+    model = _create("zen_europe_ind_heat_v1_full_flexibility_single_temp")
     names = set(model.elements)
     assert "heat_pump_industry_150_200_water_glass" in names
     assert "heat_pump_industry_0_100_water_glass" not in names

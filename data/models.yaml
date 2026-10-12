@@ -23,8 +23,14 @@ defaults:
         - industry_dsm
 
 models:
+  # ZEN-europe base: no industrial heat (paper, ceramic, glass, food) and no TES/DSM
+  zen_europe_base:
+    settings:
+      structure:
+        remove_sectors: [industry_heat, industry_tes, industry_dsm]
+
   # full flexibility: thermal energy storage and demand-side management
-  zen_europe_ind_heat_v1: {}
+  zen_europe_ind_heat_v1_full_flexibility: {}
 
   zen_europe_ind_heat_v1_no_flexibility:
     settings:
@@ -53,7 +59,7 @@ models:
         dsm_shiftability: pessimistic
 
   # only the highest temperature band has heat pumps
-  zen_europe_ind_heat_v1_single_temp:
+  zen_europe_ind_heat_v1_full_flexibility_single_temp:
     settings:
       structure:
         remove_technologies: &low_band_heat_pumps
@@ -74,7 +80,7 @@ models:
           - heat_pump_industry_100_150_waste_heat_food
           - heat_pump_industry_100_150_water_food
 
-  zen_europe_ind_heat_v1_no_flex_single_temp:
+  zen_europe_ind_heat_v1_no_flexibility_single_temp:
     extends: zen_europe_ind_heat_v1_no_flexibility
     settings:
       structure:

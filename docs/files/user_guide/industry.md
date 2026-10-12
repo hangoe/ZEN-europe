@@ -29,7 +29,8 @@ Input data are computed in `IndustryProductionData` (`industry_production_data.p
 
 | scenario | change |
 |---|---|
-| full flexibility | `zen_europe_ind_heat_v1` |
+| base (no industrial heat, TES or DSM) | `zen_europe_base` |
+| full flexibility | `zen_europe_ind_heat_v1_full_flexibility` |
 | no flexibility / TES only / DSM only | remove `industry_tes` and/or `industry_dsm` |
 | no diffusion | `investment.use_diffusion_rates: false` |
 | DSM pessimistic | `industry.dsm_shiftability: pessimistic` |
