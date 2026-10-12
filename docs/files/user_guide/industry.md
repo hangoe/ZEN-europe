@@ -7,13 +7,12 @@ Input data are computed in `IndustryProductionData` (`industry_production_data.p
 ## Structure
 
 - **Sectors**: glass, ceramic, paper, food. Each has a product carrier and a
-  `<sector>_production` technology. Cement remains in the base model.
+  `<sector>_production` technology. Cement, steel and chemicals are part of the main model.
 - **Heat bands**: heat < 200 °C is split into `heat_industry_{0_100,100_150,150_200}_<sector>`,
-  so heat pumps are valued at the COP of each band. Heat > 200 °C is a direct fuel input
+  so heat pump efficiency (COP) depends on the band. Heat > 200 °C is a direct fuel input
   of the production technology.
 - **Per-sector heat chain**: boilers, heat pumps, cascade, kiln fuel and TES are defined
-  per sector (`<name>_<sector>`), so heat cannot be exchanged between sectors. Sectors
-  couple only through upstream carriers.
+  per sector (`<name>_<sector>`), so heat cannot be exchanged between sectors.
 
 ### Settings (`industry.*`, `zen_europe/settings/industry.py`)
 
@@ -22,7 +21,7 @@ Input data are computed in `IndustryProductionData` (`industry_production_data.p
 | `data_year` | 2023 | year of production, energy and heat statistics |
 | `operating_hours` | 8000 | full-load hours of production plants and boilers |
 | `fuel_share_cutoff` | 0.10 | minimum fuel share in the > 200 °C fuel mix |
-| `capacity_limit_margin` | 2.0 | capacity limit of pass-through technologies (× flat demand) |
+| `capacity_limit_margin` | 2.0 | capacity limit of pass-through technologies (× demand) |
 | `min_boiler_capacity` | 0.005 GW | existing boiler capacity per node below this is set to 0 |
 | `dsm_shiftability` | `optimistic` | DSM category column |
 
@@ -34,18 +33,18 @@ Input data are computed in `IndustryProductionData` (`industry_production_data.p
 | no flexibility / TES only / DSM only | remove `industry_tes` and/or `industry_dsm` |
 | no diffusion | `investment.use_diffusion_rates: false` |
 | DSM pessimistic | `industry.dsm_shiftability: pessimistic` |
-| single temperature (`_single_temp`) | removes the 0–100 and 100–150 °C heat pumps; lower bands are served via the cascade at the 150–200 °C COP (upper bound on heat pump electricity) |
+| single temperature (`_single_temp`) | removes the 0–100 and 100–150 °C heat pumps. Lower bands are served via the cascade |
 
 ## Product demand and existing capacity
 
 Demand (t/h) = existing production capacity ÷ `operating_hours`. Net trade is not
 modeled. Existing heat supply (boilers, waste heat, kiln fuel) is based on annual average
-production (JRC-IDEES output ÷ 8760 h).
+production (JRC-IDEES output ÷ 8760 h). # TODO
 
 | sector | basis |
 |---|---|
 | glass, paper | JRC-IDEES-2023 installed capacity |
-| ceramic | JRC-IDEES thermal final energy of kilns/dryers ÷ Rehfeldt weighted fuel intensity (8.04 GJ/t). JRC reports "kt bricks eq.", which Rehfeldt does not cover; using tonnage directly would overstate energy ~4× |
+| ceramic | JRC-IDEES thermal final energy ÷ Rehfeldt weighted fuel intensity |
 | food | Rehfeldt EU28+3 activity per sub-process, distributed to nodes by FAOSTAT production of a proxy item (`FOOD_ITEMS`) |
 
 **Nodes without JRC-IDEES** (CH, NO, UK; `NODES_WITHOUT_IDEES`):
@@ -72,8 +71,6 @@ Rehfeldt (2017), weighted by sub-process activity. Temperature mapping of fuel d
 | 100–200 °C | 100–150 / 150–200 °C, split by Wolf (2017), Table 4-7 |
 | > 200 °C | direct fuel input |
 
-Electricity is not split.
-
 **Fuel mix > 200 °C**: EU27 JRC-IDEES thermal final energy mix per sector, mapped via
 `FUELS` (natural gas → `natural_gas`, solids → `hard_coal`, biomass and waste →
 `biomass`, other liquids → `oil`). Shares below `fuel_share_cutoff` are dropped and the
@@ -81,8 +78,9 @@ rest renormalized.
 
 **Costs**: JRC-EU-TIMES values (EUR2006), the ceramic proxy (EUR2014) and the food costs
 are inflated to `time.reference_year` with the ECB HICP (`ECBInflation`), as all other
-costs, and converted from EUR/(t/yr) to EUR/(t/h) (× 8760). Variable O&M excludes energy. **Process CO2**
-(`CARBON_INTENSITY`) covers non-combustion emissions only.
+costs, and converted from EUR/(t/yr) to EUR/(t/h) (× 8760, rated capacity; as for all other
+technologies). Variable O&M excludes energy. **Process CO2** (`CARBON_INTENSITY`) covers
+non-combustion emissions only.
 
 | sector | cost source | capex | fixed O&M | var. O&M | lifetime | process CO2 (t/t) |
 |---|---|---|---|---|---|---|
@@ -104,7 +102,6 @@ costs, and converted from EUR/(t/yr) to EUR/(t/h) (× 8760). Variable O&M exclud
 - No ceramic cost data exist; a cement clinker plant (before capture) is used as a
   kiln-fired mineral proxy. Fixed O&M: maintenance 2.5 %, insurance 2 %, 100 operators ×
   60 k EUR, 30 % overhead. Variable O&M: raw meal + NOx reagent + 6.75 EUR/t other.
-  Variable O&M is the most uncertain parameter (glass batch materials are costlier).
 - Process CO2 from the JRC BAT share of process emissions (15 % of total): combustion
   = 8.036 GJ/t × 0.0453 t/GJ (fuel-mix weighted) ≈ 0.364 t/t; process = 0.364 × 15/85
   ≈ 0.0642 t/t.
@@ -122,8 +119,11 @@ costs, and converted from EUR/(t/yr) to EUR/(t/h) (× 8760). Variable O&M exclud
 
 - Rehfeldt sub-processes dairy, meat, brewing, bakery, sugar (bakery and sugar carry the
   > 200 °C demand).
-- No JRC food process; costs are the rounded mean of hollow glass, quicklime and copper
-  finishing.
+- No JRC-EU-TIMES food process exists and no consistent cost data for EU food plants are
+  available. Food plants are mostly low-temperature, non-kiln processing lines, so the costs
+  are taken from three moderately capital-intensive, mid-sized JRC processes (hollow glass,
+  quicklime, copper finishing) rather than one specific one; the values are rounded to
+  reflect the uncertainty.
 
 ## Kiln fuel switching
 
@@ -163,7 +163,7 @@ technical ceramics is treated as not switchable (worst case).
 | **total** | | | **47.49** | | | **1.23** |
 
 Switchable = 46.26 / 47.49 ≈ 97.4 %. Limitations: the BREF gives no temperature limit for
-hydrogen (§4.2.4), so the locked share is likely overstated; natural gas is assumed to
+hydrogen (§4.2.4), so the locked share is optimistic; natural gas is assumed to
 follow the sector's fuel temperature distribution; coal co-firing for some facing bricks
 (§4.1.6.3.5) is not included. The value is a technical ceiling: current adoption is
 negligible (BREF Table 3-201: 6 electrified, 1 hydrogen of 199 plants).
@@ -196,10 +196,12 @@ O&M changes via `opex_specific_variable_yearly_variation`.
 | electrode | 5.1a electric boiler, steam, 2 MW | 250 | 1.44 | 0.674 | 25 | 99 % |
 | natural gas, oil | 6.1 boiler, gas and oil, 5 MW | 90 | 2.0 | 1.23 | 25 | 94 % |
 | biomass | 6.2 boiler, biomass, 6.5 MW | 878 | 39.5 | 1.45 | 25 | 89 % |
-| coal | 6.3 boiler, coal | DEA | DEA | DEA | DEA | DEA |
-| waste | – (as `waste_boiler_DH`) | | | | | |
+| coal | 6.3 boiler, coal, 5 MW | 565 | 40.0 | 1.45 | 25 | 90 % |
+| waste | – (as `waste_boiler_DH`) | 1,295 | 16.8 | 1.45 | 30 | 94 % |
 
-Central values, 2025 EUR. The 2 MW electrode boiler is used instead of 15 MW
+Central values, 2025 EUR. Waste: no DEA industrial sheet; values of `waste_boiler_DH`
+(capex: mean of DEA and EU Reference Scenario 2020; O&M: EU Reference Scenario 2020),
+year 2025 in 2022 EUR. The 2 MW electrode boiler is used instead of 15 MW
 (110 EUR/kW), which would undercut the gas boiler capex.
 
 ### Heat pumps
@@ -230,8 +232,7 @@ without losses or costs. Existing capacity = lower-band demand; capacity limit =
 Existing boiler capacity per node = heat demand of all four sectors (average production
 × heat intensity), split by fuel and sector.
 
-**Fuel shares**: Eurostat gross heat production (`nrg_bal_c`, 2023). This is effectively
-a district-heating/CHP proxy; no industry-only split exists.
+**Fuel shares**: Eurostat gross heat production (`nrg_bal_c`, 2023).
 
 - oil = "Oil and petroleum products" (fuel oil alone gives 1.0 % vs. 4.6 % EU share;
   Fraunhofer 2012: 7.4 %);
@@ -282,16 +283,14 @@ technologies with the same class and reference carrier, and (3)
 
 - **Heat pump seed** (`capacity_addition_unbounded`): existing `heat_pump_DH` capacity,
   split by sector share of EU band heat demand, divided by the number of nodes, scaled by
-  `interval_between_years / SEED_YEARS`. Required for feasibility; treat as a sensitivity.
+  `interval_between_years / SEED_YEARS`. Required for feasibility; sensible as technologies
+  are similar.
 - **Pass-through technologies** (cascade, `natural_gas_to_kilnfuel`) share the reference
   carrier with heat pumps and alternative kiln fuels, respectively. Without capex or a
   limit their capacity is arbitrary and inflates term (2). They therefore get existing
   capacity and `capacity_limit` = flat demand × `capacity_limit_margin` (2.0, ~10 % above
   the largest observed peak-to-mean ratio of 1.80). The margin must be > 1.
 - Heat pump market-share peers are the boilers and cascade of the same sector.
-- **Known ZEN-garden inconsistency**: terms (2) and (3) are documented per year but
-  applied per period. With `interval_between_years = 2` this halves the headroom; not
-  compensated.
 
 ## Thermal energy storage
 
@@ -387,4 +386,4 @@ modeled sectors (2022 limit: ~+5.5 %).
 - Schneider, N. T., Lagoni, Z. (2023). *Flexibility of Power-to-Methanol in 2030.* Master's thesis, Aalborg University.
 - Tangram Technology. *Energy management in ceramics processing* (no date; accessed 2026-07-20). <https://tangram.co.uk/wp-content/uploads/Energy-and-Sustainability-Topics-Energy-management-in-ceramics-processing.pdf>
 - Tiggeloven, J. L., Faaij, A. P. C., Kramer, G. J., Gazzani, M. (2023). Optimization of electric ethylene production: Exploring the role of cracker flexibility, batteries, and renewable energy integration. *Ind. Eng. Chem. Res.* 62(40). doi:10.1021/acs.iecr.3c02226.
-- Ana [last name missing] (2026). Personal interview (`input_data/DSM_parametrization/DMS_processes_Ana.xlsx`). **TODO.**
+- Ana Perez Recatala (2026). Personal interview (`input_data/DSM_parametrization/DMS_processes_Ana.xlsx`). **TODO.**
