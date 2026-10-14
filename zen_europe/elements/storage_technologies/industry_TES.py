@@ -6,6 +6,7 @@ from zen_creator import StorageTechnology
 from zen_creator.datasets.datasets.metadata import AssumptionInformation
 from zen_creator.utils.attribute import Attribute
 
+from zen_europe.datasets.datasets.technology.brown2018 import Brown2018
 from zen_europe.datasets.datasets.technology.mayer2024 import Mayer2024
 
 if TYPE_CHECKING:
@@ -21,6 +22,8 @@ class IndustryTES:
     # energy-to-power ratio (h): water tanks are intraday buffers of at least 1 h,
     # steam accumulators are short-duration pressure vessels
     duration: ClassVar[tuple[float, float]]
+    # Brown et al. (2018) technology for the self-discharge
+    self_discharge_proxy: ClassVar[str] = "hot water tank decentral"
 
     def __init__(self, model: Model, power_unit: str = "MW"):
         super().__init__(model=model, power_unit=power_unit)
@@ -50,27 +53,25 @@ class IndustryTES:
         return Mayer2024(self.source_path).get_opex_specific_fixed_energy(self)
 
     def _set_efficiency_charge(self) -> Attribute:
-        """Losses are in the self-discharge."""
+        """Losses neglected."""
         return self.efficiency_charge.set_data(
             default_value=1.0,
             unit="1",
-            source=AssumptionInformation(description="Losses in the self-discharge."),
+            source=AssumptionInformation(description="Losses neglected."),
         )
 
     def _set_efficiency_discharge(self) -> Attribute:
-        """Losses are in the self-discharge."""
+        """Losses neglected."""
         return self.efficiency_discharge.set_data(
             default_value=1.0,
             unit="1",
-            source=AssumptionInformation(description="Losses in the self-discharge."),
+            source=AssumptionInformation(description="Losses neglected."),
         )
 
     def _set_self_discharge(self) -> Attribute:
-        """Standing thermal loss of 5 % per hour."""
-        return self.self_discharge.set_data(
-            default_value=0.05,
-            unit="1",
-            source=AssumptionInformation(description="5 % standing loss per hour."),
+        """Self-discharge from Brown et al. (2018)."""
+        return Brown2018(self.source_path).get_self_discharge(
+            self, self.self_discharge_proxy
         )
 
     def _set_opex_specific_variable(self) -> Attribute:

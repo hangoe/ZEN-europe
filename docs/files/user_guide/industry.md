@@ -295,8 +295,9 @@ technologies with the same class and reference carrier, and (3)
 
 ## Thermal energy storage
 
-Per sector: water tanks (0–100, 100–150 °C) and a steam accumulator (150–200 °C), from
-Mayer et al. (2024), Table 3. No existing capacity.
+Per sector: water tanks (0–100, 100–150 °C) and a steam accumulator (150–200 °C). Costs
+and lifetimes from Mayer et al. (2024), Table 3; self-discharge from Brown et al. (2018),
+Table 1. No existing capacity.
 
 | | water tank | steam accumulator |
 |---|---|---|
@@ -306,9 +307,12 @@ Mayer et al. (2024), Table 3. No existing capacity.
 | lifetime (yr) | 30 | 25 |
 | energy-to-power ratio (h) | 1–24 | 0.25–4 |
 | charge/discharge efficiency | 1 | 1 |
-| self-discharge | 5 %/h | 5 %/h |
+| self-discharge | 1.38 %/h (τ = 3 d) | 1.38 %/h (τ = 3 d) |
 
-Self-discharge is an assumption (no data in Mayer). Variable O&M prevents spurious cycling.
+Self-discharge follows Brown et al. (2018): a share 1 − exp(−1/(24τ)) of the stored heat
+is lost per hour, with the decay time constant τ = 3 days of short-term (decentral) hot
+water tanks (`Brown2018_Table1.csv`). Steam accumulators use the same value as a proxy.
+(Dis)charging losses are neglected. Variable O&M prevents spurious cycling.
 
 ## Demand-side management
 
@@ -356,6 +360,7 @@ modeled sectors (2022 limit: ~+5.5 %).
 
 **Data and techno-economics**
 - AIDRES (2023). European Commission, DG ENER. *AIDRES: Advancing industrial decarbonization by assessing the future use of renewable energies in industrial processes.* doi:10.2833/696697. Tables 19, 21, 23.
+- Brown, T., Schlachtberger, D., Kies, A., Schramm, S., Greiner, M. (2018). Synergies of sector coupling and transmission reinforcement in a cost-optimised, highly renewable European energy system. *Energy* 160, 720–739. doi:10.1016/j.energy.2018.06.222. Table 1.
 - BFE (2025). Bundesamt für Energie. *Energieverbrauch in der Industrie und im Dienstleistungssektor*, Resultate 2024.
 - DEA. Danish Energy Agency. *Technology Data for Industrial Process Heat*; *Technology Data for Carbon Capture, Transport and Storage*.
 - Eurostat. *Complete energy balances* (nrg_bal_c). doi:10.2908/NRG_BAL_C.

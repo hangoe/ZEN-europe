@@ -18,6 +18,7 @@ from zen_europe.datasets.dataset_collections.industry_production_data import (
 )
 from zen_europe.datasets.datasets.carrier.rehfeldt2017 import Rehfeldt2017
 from zen_europe.datasets.datasets.carrier.wolf2017 import Wolf2017
+from zen_europe.datasets.datasets.technology.brown2018 import Brown2018
 from zen_europe.datasets.datasets.technology.dsm_literature_review import (
     CATEGORIES,
     DSMLiteratureReview,
@@ -154,3 +155,10 @@ def test_dsm_shiftability() -> None:
     assert cost("ceramic", "pessimistic") == 1000.0
     # energy basis: per GWh instead of per tonne
     assert cost("ammonia", "optimistic") == pytest.approx(20.0 / (18.6 / 3600))
+
+
+def test_tes_self_discharge_brown2018() -> None:
+    brown = Brown2018(RAW_DATA_PATH)
+    assert brown.data.at["hot water tank decentral", "tau_days"] == 3
+    assert Brown2018.hourly_self_discharge(3) == pytest.approx(0.013793, rel=1e-4)
+    assert Brown2018.hourly_self_discharge(20 / 24) == pytest.approx(0.0488, rel=1e-3)
