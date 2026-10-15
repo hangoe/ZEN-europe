@@ -22,6 +22,8 @@ Input data are computed in `IndustryProductionData` (`industry_production_data.p
 | `operating_hours` | 8000 | full-load hours of production plants and boilers |
 | `fuel_share_cutoff` | 0.10 | minimum fuel share in the > 200 °C fuel mix |
 | `capacity_limit_margin` | 2.0 | capacity limit of pass-through technologies (× demand) |
+| `hp_seed_years` | 15 | build-out years of DH heat pumps for the heat pump seed |
+| `hp_share_first_year` | 0.02 | first-year heat pump cap (share of band demand) |
 | `min_boiler_capacity` | 0.005 GW | existing boiler capacity per node below this is set to 0 |
 | `dsm_shiftability` | `optimistic` | DSM category column |
 
@@ -120,11 +122,9 @@ non-combustion emissions only.
 
 - Rehfeldt sub-processes dairy, meat, brewing, bakery, sugar (bakery and sugar carry the
   > 200 °C demand).
-- No JRC-EU-TIMES food process exists and no consistent cost data for EU food plants are
-  available. Food plants are mostly low-temperature, non-kiln processing lines, so the costs
-  are taken from three moderately capital-intensive, mid-sized JRC processes (hollow glass,
-  quicklime, copper finishing) rather than one specific one; the values are rounded to
-  reflect the uncertainty.
+- No consistent food cost data exist. Costs are rounded from three mid-sized JRC processes
+  (hollow glass, quicklime, copper finishing), as food plants are mostly low-temperature
+  processing lines.
 
 ## Kiln fuel switching
 
@@ -282,15 +282,19 @@ technologies with the same class and reference carrier, and (3)
 `capacity_addition_unbounded`. New industry heat technologies (boilers, heat pumps, alternative kiln fuels) are in the
 `MEDIUM` category of `TechnologyDiffusionMannhardt`, as the district heating technologies.
 
-- **Heat pump seed** (`capacity_addition_unbounded`): existing `heat_pump_DH` capacity,
-  split by sector share of EU band heat demand, divided by the number of nodes, scaled by
-  `interval_between_years / SEED_YEARS`. Required for feasibility; sensible as technologies
-  are similar.
+- **Heat pump seed** (`capacity_addition_unbounded`): annual `heat_pump_DH` build-out
+  (fleet / `hp_seed_years`) × `interval_between_years`, split by the sector-band share of
+  EU industry heat demand, by heat source and by node. Summed over nodes, all industry heat
+  pumps share one DH build-out per period. Required for feasibility. `hp_seed_years` = 15
+  ≈ fleet / recent DH additions (~0.15 GW/yr).
+- **First-year heat pump cap** (`capacity_limit`): in the reference year, at most
+  `hp_share_first_year` (2 %) of the band demand per node, split by heat source (no
+  industrial heat pumps today). Without it, term (2) alone allows ~8 % of the demand.
 - **Pass-through technologies** (cascade, `natural_gas_to_kilnfuel`) share the reference
-  carrier with heat pumps and alternative kiln fuels, respectively. Without capex or a
-  limit their capacity is arbitrary and inflates term (2). They therefore get existing
-  capacity and `capacity_limit` = flat demand × `capacity_limit_margin` (2.0, ~10 % above
-  the largest observed peak-to-mean ratio of 1.80). The margin must be > 1.
+  carrier with heat pumps and alternative kiln fuels. Without capex or limit, their
+  capacity would inflate term (2), so they get existing capacity and `capacity_limit` =
+  flat demand × `capacity_limit_margin` (2.0, ~10 % above the max. peak-to-mean ratio of
+  1.80; must be > 1).
 - Heat pump market-share peers are the boilers and cascade of the same sector.
 
 ## Thermal energy storage
@@ -309,10 +313,9 @@ Table 1. No existing capacity.
 | charge/discharge efficiency | 1 | 1 |
 | self-discharge | 1.38 %/h (τ = 3 d) | 1.38 %/h (τ = 3 d) |
 
-Self-discharge follows Brown et al. (2018): a share 1 − exp(−1/(24τ)) of the stored heat
-is lost per hour, with the decay time constant τ = 3 days of short-term (decentral) hot
-water tanks (`Brown2018_Table1.csv`). Steam accumulators use the same value as a proxy.
-(Dis)charging losses are neglected. Variable O&M prevents spurious cycling.
+Self-discharge per hour = 1 − exp(−1/(24τ)), with τ = 3 d of decentral hot water tanks
+(`Brown2018_Table1.csv`), also used for steam accumulators. (Dis)charging losses are
+neglected; variable O&M prevents spurious cycling.
 
 ## Demand-side management
 

@@ -17,6 +17,10 @@ class IndustrySettings(SettingsCategory):
     # capacity limit of the zero-cost pass-through technologies, as a multiple of
     # the flat demand they serve (techs: heat temp conversion, _to_kilnfuel techs)
     capacity_limit_margin: float = 2.0
+    # DH heat pump build-out years; their annual build-out seeds the industry heat pumps
+    hp_seed_years: float = 15.0
+    # first-year cap on industry heat pumps, share of band demand
+    hp_share_first_year: float = 0.02
     # existing boiler capacities below this value (GW per node) are set to zero
     min_boiler_capacity: float = 0.005
     dsm_shiftability: Literal["optimistic", "pessimistic"] = "optimistic"

@@ -96,9 +96,7 @@ class HeatPumpIndustry:
         )
 
     def _set_capacity_limit(self) -> Attribute:
-        """Waste heat available in the sector; unlimited for water."""
-        if self.heat_source == "water":
-            return self.capacity_limit
+        """First-year cap; waste heat limit for waste-heat heat pumps."""
         return self._supply().get_capacity_limit_heat_pump(self)
 
     def _set_capacity_addition_unbounded(self) -> Attribute:

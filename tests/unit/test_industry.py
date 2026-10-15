@@ -100,7 +100,7 @@ def test_boiler_capacity_matches_demand_and_fuel_totals(
 ) -> None:
     capacity = heat_supply._boiler_capacity
     demand = pd.DataFrame({
-        s: production.calculate_production(s)
+        s: production.calculate_demand(s)
         * production.calculate_energy_intensity(s)["heat"]
         for s in SECTORS
     })

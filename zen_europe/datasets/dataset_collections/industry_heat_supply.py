@@ -59,8 +59,6 @@ FIT_TOLERANCE = 1e-10
 CARNOT_EFFICIENCY = 0.5
 SUPPLY_TEMPERATURE = {"0_100": 348.15, "100_150": 398.15, "150_200": 448.15}
 SOURCE_TEMPERATURE = {"waste_heat": 323.15, "water": 288.15}
-# years of district heating heat pump build-out that seed the industry heat pumps
-SEED_YEARS = 2
 # waste-heat recovery (heat exchangers, piping) on top of the heat pump, Euro/kW:
 # between 1,234 and 1,645 Euro/kW in Stark et al. (2025), Joule 9, 102157, Table 2
 WASTE_HEAT_RECOVERY_CAPEX = 1500.0
@@ -173,45 +171,65 @@ class IndustryHeatSupply(DatasetCollection):
         )
 
     def get_capacity_limit_heat_pump(self, element: Element) -> Attribute:
-        """Get the waste heat of the sector's high-temperature processes in the
-        band."""
-        production = self._production_data
-        sector = element.sector
-        heat = production.calculate_heat_conversion_factors(sector)
-        share = heat[element.temp_level] / heat[list(HEAT_LEVELS)].sum()
-        fuel = production.calculate_energy_intensity(sector)["fuel"]
-        waste_heat = production.calculate_production(sector) * fuel * share
+        """Get the first-year cap (share of band demand) and, for waste heat, the
+        sector's waste heat in the band."""
+        nodes = pd.Index(self.settings.region.set_nodes, name="node")
+        years = pd.Index(self.settings.time.years, name="year")
+        limit = pd.Series(np.inf, index=nodes)
+        description = ""
+        if element.heat_source == "waste_heat":
+            production = self._production_data
+            sector = element.sector
+            heat = production.calculate_heat_conversion_factors(sector)
+            share = heat[element.temp_level] / heat[list(HEAT_LEVELS)].sum()
+            fuel = production.calculate_energy_intensity(sector)["fuel"]
+            waste_heat = production.calculate_production(sector) * fuel * share
+            limit = waste_heat.reindex(nodes, fill_value=np.inf)
+            description = (
+                "Waste heat of processes > 200 °C (their fuel demand), split by band "
+                "heat demand. "
+            )
+        first_share = self.settings.industry.hp_share_first_year
+        demand = self._heat_demand.loc[(element.sector, element.temp_level)]
+        first_year = demand.reindex(nodes, fill_value=0.0) * first_share / len(
+            SOURCE_TEMPERATURE)
+        limit = pd.DataFrame({year: limit for year in years})
+        limit[years[0]] = np.minimum(limit[years[0]], first_year)
         return element.capacity_limit.set_data(
             default_value=np.inf,
             unit="GW",
-            df=waste_heat.rename("capacity_limit").to_frame(),
+            df=limit.stack().rename_axis(["node", "year"]).rename(
+                "capacity_limit").to_frame(),
             source=SourceInformation(
                 description=(
-                    "The waste heat of the processes above 200 °C, i.e., their fuel "
-                    "demand, split by the sector's heat demand per temperature band."
+                    description
+                    + f"{years[0]}: at most {first_share:.0%} of band demand per node, "
+                    "split by heat source."
                 ),
                 metadata=self.metadata,
             ),
         )
 
     def get_capacity_addition_unbounded_heat_pump(self, element: Element) -> Attribute:
-        """Get the seed: the district heating heat pumps, split by the sector's band
-        demand."""
+        """Get the seed: annual DH heat pump build-out, split by sector-band demand
+        share, heat source and node."""
         fleet = float(
             element.model.elements["heat_pump_DH"].capacity_existing.df.squeeze().sum()
         )
-        band_demand = self._heat_demand.xs(element.temp_level, level="level").sum(axis=1)
-        share = band_demand[element.sector] / band_demand.sum()
+        demand = self._heat_demand.sum(axis=1)
+        share = demand[element.sector, element.temp_level] / demand.sum()
+        heat_sources = len(SOURCE_TEMPERATURE)
         nodes = len(self.settings.region.set_nodes)
         interval = self.settings.time.interval_between_years
+        seed_years = self.settings.industry.hp_seed_years
         return element.capacity_addition_unbounded.set_data(
-            default_value=fleet * share / nodes * interval / SEED_YEARS,
+            default_value=fleet / seed_years * interval * share / heat_sources / nodes,
             unit="GW",
             source=SourceInformation(
                 description=(
-                    "The existing district heating heat pumps, split by the sector's "
-                    "share in the heat demand of the band and by node, built over "
-                    f"{SEED_YEARS} years, see docs, 'Diffusion'."
+                    f"Annual build-out of the DH heat pumps (fleet / {seed_years} yr) "
+                    "per period, split by sector-band demand share, heat source and "
+                    "node, see docs, 'Diffusion'."
                 ),
                 metadata=self.metadata,
             ),
@@ -370,8 +388,9 @@ class IndustryHeatSupply(DatasetCollection):
         the sectors' JRC-IDEES fuel mix deciding who gets which fuel.
         """
         production = self._production_data
+        # production capacity basis, as the heat carriers
         demand = pd.DataFrame({
-            sector: production.calculate_production(sector)
+            sector: production.calculate_demand(sector)
             * production.calculate_energy_intensity(sector)["heat"]
             for sector in SECTORS
         })  # node x sector
