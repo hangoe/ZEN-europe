@@ -22,11 +22,11 @@ class Constants:
     GJ_PER_MWH: float = 3.6
     """1 MWh = 3.6 GJ, from the definition 1 Wh = 3600 J."""
 
-    GJ_PER_KTOE: float = 41868.0
-    """1 ktoe = 1000 toe x 41.868 GJ/toe."""
-
     TOE_PER_MWH: float = 0.0859845
     """IEA definition: 1 toe = 41.868 GJ = 11.63 MWh, so 1 MWh = 0.0859845 toe."""
+
+    GJ_PER_KTOE: float = 1000 * GJ_PER_MWH / TOE_PER_MWH
+    """1 ktoe = 1000 toe x 41.868 GJ/toe."""
 
     BARREL_PER_TON: float = 7.46
     """Conversion factor from tons of crude oil to barrels."""

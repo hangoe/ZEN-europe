@@ -12,9 +12,9 @@ if TYPE_CHECKING:
 
 
 class HeatIndustry:
-    """Process heat of one industry heat sector in one temperature band."""
+    """Process heat or kiln fuel of one industry heat sector."""
 
-    def __init__(self, model: Model, power_unit: str = "GW"):
+    def __init__(self, model: Model, power_unit: str = "MW"):
         super().__init__(model=model, power_unit=power_unit)
 
     def _set_availability_export_yearly(self) -> Attribute:

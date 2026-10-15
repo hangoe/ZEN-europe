@@ -9,10 +9,11 @@ from zen_creator.utils.attribute import Attribute
 from zen_europe.datasets.dataset_collections.industry_heat_supply import (
     IndustryHeatSupply,
 )
-from zen_europe.datasets.datasets.carrier.aidres_glass import AIDRESGlass
+from zen_europe.datasets.datasets.carrier.aidres import Aidres
 from zen_europe.datasets.datasets.technology.technology_diffusion_mannhardt import (
     TechnologyDiffusionMannhardt,
 )
+from zen_europe.utils.industry import kiln_fuel
 
 if TYPE_CHECKING:
     from zen_creator.model import Model
@@ -26,8 +27,10 @@ class KilnFuelIndustry:
 
     sector: ClassVar[str]
     fuel: ClassVar[str]
+    # cement fuel technology the diffusion rate is taken from
+    diffusion_proxy: ClassVar[str] = "hydrogen_to_cement_fuel"
 
-    def __init__(self, model: Model, power_unit: str = "GW"):
+    def __init__(self, model: Model, power_unit: str = "MW"):
         super().__init__(model=model, power_unit=power_unit)
 
     # ---------- Required methods that are called during object construction ----------
@@ -52,7 +55,7 @@ class KilnFuelIndustry:
 
     def _set_conversion_factor(self) -> Attribute:
         """Route efficiency from AIDRES."""
-        return AIDRESGlass(self.source_path).get_conversion_factor_kiln_fuel(self)
+        return Aidres(self.source_path).get_conversion_factor_kiln_fuel(self)
 
     def _set_lifetime(self) -> Attribute:
         """
@@ -101,10 +104,12 @@ class KilnFuelIndustry:
         ):
             return self.max_diffusion_rate
         diffusion_rates = TechnologyDiffusionMannhardt(source_path=self.source_path)
-        return diffusion_rates.get_max_diffusion_rate(self)
+        return diffusion_rates.get_max_diffusion_rate(
+            self, proxy_element_name=self.diffusion_proxy
+        )
 
     def _kiln_fuel(self) -> str:
-        return f"fuel_to_kiln_{self.sector}"
+        return kiln_fuel(self.sector)
 
 
 class NaturalGasToKilnfuel(KilnFuelIndustry):

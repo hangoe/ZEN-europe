@@ -15,6 +15,11 @@ from zen_europe.datasets.datasets.technology.dsm_literature_review import (
 if TYPE_CHECKING:
     from zen_creator.model import Model
 
+# no physical asset (yr), own assumption
+DSM_LIFETIME = 50.0
+# small loss against simultaneous charging and discharging, own assumption
+DSM_EFFICIENCY = 0.999
+
 
 class IndustryDSM:
     """Demand-side management: shifting the production of an industrial product."""
@@ -37,7 +42,7 @@ class IndustryDSM:
     def _set_lifetime(self) -> Attribute:
         """No physical asset."""
         return self.lifetime.set_data(
-            default_value=50.0,
+            default_value=DSM_LIFETIME,
             unit="1",
             source=AssumptionInformation(description="No physical asset."),
         )
@@ -45,7 +50,7 @@ class IndustryDSM:
     def _set_efficiency_charge(self) -> Attribute:
         """Small loss against simultaneous charging and discharging."""
         return self.efficiency_charge.set_data(
-            default_value=0.999,
+            default_value=DSM_EFFICIENCY,
             unit="1",
             source=AssumptionInformation(description="Small loss against cycling."),
         )
@@ -53,7 +58,7 @@ class IndustryDSM:
     def _set_efficiency_discharge(self) -> Attribute:
         """Small loss against simultaneous charging and discharging."""
         return self.efficiency_discharge.set_data(
-            default_value=0.999,
+            default_value=DSM_EFFICIENCY,
             unit="1",
             source=AssumptionInformation(description="Small loss against cycling."),
         )
@@ -79,8 +84,7 @@ class IndustryDSM:
         nodes = list(self.model.config.system.set_nodes)
         nodes += [node for node in demand.index if node not in nodes]
         limit = (
-            (demand * 1.0)
-            .reindex(pd.Index(nodes, name=demand.index.name))
+            demand.reindex(pd.Index(nodes, name=demand.index.name))
             .fillna(0.0)
             .rename("capacity_limit")
         )

@@ -13,7 +13,7 @@ _KT_PER_GT = 1e6
 class ONSIndustryEmissions(Dataset[pd.DataFrame]):
     """CO2 emissions of the UK paper and food industries, as reported by the ONS."""
 
-    name = "ons_industry_emissions_co2"
+    name = "ons_industry_emissions"
 
     def __init__(self, source_path: Path | str | None = None):
         super().__init__(source_path=source_path)
@@ -41,7 +41,7 @@ class ONSIndustryEmissions(Dataset[pd.DataFrame]):
             self.source_path
             / "01-energy_system"
             / "ons_industry_emissions"
-            / f"{self.name}.csv"
+            / "ons_industry_emissions_co2.csv"
         )
 
     def _set_data(self) -> pd.DataFrame:

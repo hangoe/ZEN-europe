@@ -43,6 +43,8 @@ class Mayer2024(Dataset[pd.DataFrame]):
         )
 
     def _set_path(self) -> Path:
+        if self.source_path is None:
+            raise ValueError("source_path must be set to load the dataset.")
         return self.source_path / "03-technology" / "industry" / "Mayer2024_Table3.csv"
 
     def _set_data(self) -> pd.DataFrame:

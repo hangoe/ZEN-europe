@@ -117,7 +117,7 @@ _CCS_SCENARIOS = {"min": "Lower", "max": "Upper", "ref": "Est"}
 # ens.dk/sites/ens.dk/files/... URLs no longer resolve), and the local filename each is cached
 # under on first load (matching the other agencies' checked-in-raw-file convention). Each
 # workbook contains an "alldata_flat" sheet.
-_SOURCES: dict[str, tuple[str, str | None]] = {
+_SOURCES: dict[str, tuple[str, str]] = {
     "main": ("technology_data_for_el_and_dh.xlsx", "https://ens.dk/media/8615/download"),
     "ih": ("technology_data_heating_installations.xlsx", "https://ens.dk/media/8518/download"),
     "rf": ("data_sheets_for_renewable_fuels.xlsx", "https://ens.dk/media/6444/download"),
@@ -436,8 +436,6 @@ class DEA(Dataset[pd.DataFrame]):
         filename, url = _SOURCES[source]
         file_path = self.path / filename
         if not file_path.exists():
-            if url is None:
-                raise FileNotFoundError(f"DEA source workbook {file_path} is missing.")
             self._download(url, file_path)
         raw = pd.read_excel(file_path, sheet_name="alldata_flat")
         if rf_category_fixup:

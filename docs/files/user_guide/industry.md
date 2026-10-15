@@ -41,8 +41,8 @@ Input data are computed in `IndustryProductionData` (`industry_production_data.p
 ## Product demand and existing capacity
 
 Demand (t/h) = existing production capacity ÷ `operating_hours`. Net trade is not
-modeled. Existing heat supply (boilers, waste heat, kiln fuel) is based on annual average
-production (JRC-IDEES output ÷ 8760 h). # TODO
+modeled. Existing boilers and the cascade are based on this demand; the waste heat limit
+and the existing kiln fuel capacity on annual average production (JRC-IDEES output ÷ 8760 h).
 
 | sector | basis |
 |---|---|
@@ -88,7 +88,7 @@ non-combustion emissions only.
 | sector | cost source | capex | fixed O&M | var. O&M | lifetime | process CO2 (t/t) |
 |---|---|---|---|---|---|---|
 | glass | JRC `IGHHOLLOW01`, `IGFFLATGL01` | 2.34 M EUR/(t/h) | 178 k EUR/(t/h)/yr | 64 EUR/t | 28 yr | 0.1 |
-| ceramic | Gardarsdóttir et al. (2019) clinker plant (`CERAMIC_PLANT`) | 1.83 M EUR/(t/h) | 158 k EUR/(t/h)/yr | 7.3 EUR/t | 25 yr | 0.0642 |
+| ceramic | Gardarsdóttir et al. (2019) clinker plant (`CementProductionGardarsdottir`) | 1.83 M EUR/(t/h) | 136 k EUR/(t/h)/yr | 7.5 EUR/t | 25 yr | 0.0642 |
 | paper | JRC `IPPHIGQUA01`, `IPPLOWQUA01`, `IPPPUPCHE01`; capex override `PAPER_CAPEX` | 700 EUR/(t/yr) | JRC | JRC | JRC | 0 |
 | food | `FOOD_COSTS` | 300 EUR/(t/yr) | 15 EUR/(t/yr)/yr | 0 | 20 yr | 0 |
 
@@ -102,9 +102,8 @@ non-combustion emissions only.
 ### Ceramic
 
 - Rehfeldt sub-processes: tiles 5.46, technical 12.11, houseware 24.24 GJ/t.
-- No ceramic cost data exist; a cement clinker plant (before capture) is used as a
-  kiln-fired mineral proxy. Fixed O&M: maintenance 2.5 %, insurance 2 %, 100 operators ×
-  60 k EUR, 30 % overhead. Variable O&M: raw meal + NOx reagent + 6.75 EUR/t other.
+- No ceramic cost data exist; the costs and lifetime of the cement clinker plant
+  (`CementProductionGardarsdottir`, as `cement_kiln`) are used as a kiln-fired mineral proxy.
 - Process CO2 from the JRC BAT share of process emissions (15 % of total): combustion
   = 8.036 GJ/t × 0.0453 t/GJ (fuel-mix weighted) ≈ 0.364 t/t; process = 0.364 × 15/85
   ≈ 0.0642 t/t.
@@ -138,7 +137,7 @@ supplied by `natural_gas_to_kilnfuel`, `hydrogen_to_kilnfuel` and
 - **Existing capacity**: `natural_gas_to_kilnfuel` at today's kiln gas flow, with
   capacity limit (see [Diffusion](#diffusion)). Alternatives start at 0 with the
   Mannhardt `MEDIUM` diffusion rate.
-- **Conversion factors** (`KILN_FUEL_INPUT`, `aidres_glass.py`): AIDRES route fuel use
+- **Conversion factors** (`KILN_FUEL_INPUT`, `aidres.py`): AIDRES route fuel use
   relative to the natural gas route; for electricity, the baseline auxiliary electricity
   (already in the production technology) is subtracted. Ceramic uses the glass factors
   (no data in the ceramic BREF).
@@ -230,7 +229,7 @@ without losses or costs. Existing capacity = lower-band demand; capacity limit =
 
 ### Existing boiler fleet
 
-Existing boiler capacity per node = heat demand of all four sectors (average production
+Existing boiler capacity per node = heat demand of all four sectors (product demand
 × heat intensity), split by fuel and sector.
 
 **Fuel shares**: Eurostat gross heat production (`nrg_bal_c`, 2023).
@@ -279,8 +278,10 @@ paper:
 ZEN-garden limits capacity additions per period (`constraint_technology_diffusion_limit_total`)
 to the sum of (1) own capacity × `max_diffusion_rate`, (2) 2 % of the capacity of all
 technologies with the same class and reference carrier, and (3)
-`capacity_addition_unbounded`. New industry heat technologies (boilers, heat pumps, alternative kiln fuels) are in the
-`MEDIUM` category of `TechnologyDiffusionMannhardt`, as the district heating technologies.
+`capacity_addition_unbounded`. New industry heat technologies take the diffusion rate of a
+proxy (`diffusion_proxy`): boilers and heat pumps that of their district heating counterpart,
+alternative kiln fuels that of `hydrogen_to_cement_fuel`, post-combustion capture that of
+`cement_post_comb` (all `MEDIUM` in `TechnologyDiffusionMannhardt`).
 
 - **Heat pump seed** (`capacity_addition_unbounded`): annual `heat_pump_DH` build-out
   (fleet / `hp_seed_years`) × `interval_between_years`, split by the sector-band share of
@@ -343,7 +344,8 @@ shiftability category (`CATEGORIES`, `dsm_literature_review.py`) with parameters
 | ammonia | 1 | 2 | flexible Haber–Bosch designs reach 10 % turndown | Salmon & Bañares-Alcántara 2023; Fahr et al. 2025 |
 | clinker | 1 | 1 | "uninterruptible" | Golmohamadi 2021, Table 5 |
 
-- Ammonia and methanol are in GW: costs per tonne are divided by LHV (18.6 / 19.9 GJ/t).
+- Ammonia and methanol are in GW: costs per tonne are divided by the energy content
+  (`Constants.AMMONIA_GWH_PER_TON`, `Constants.METHANOL_KWH_PER_KG`).
 - Efficiency 0.999 (prevents simultaneous charge/discharge), self-discharge 0.
 - Capacity limit = product demand per node. Lifetime 50 yr, minimum energy-to-power ratio 0.
 

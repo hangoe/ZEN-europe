@@ -10,27 +10,6 @@ from zen_creator import Attribute, Element, SourceInformation, Technology
 from zen_creator.datasets.datasets.dataset import Dataset
 from zen_creator.datasets.datasets.metadata import MetaData
 
-# industry heat technologies, which diffuse as the district heating technologies
-_INDUSTRY_SECTORS = ["glass", "ceramic", "paper", "food"]
-_INDUSTRY_HEAT_TECHNOLOGIES = [
-    *[
-        f"{fuel}_boiler_industry_{sector}"
-        for fuel in ["biomass", "natural_gas", "electrode", "oil", "coal", "waste"]
-        for sector in _INDUSTRY_SECTORS
-    ],
-    *[
-        f"heat_pump_industry_{level}_{source}_{sector}"
-        for level in ["0_100", "100_150", "150_200"]
-        for source in ["waste_heat", "water"]
-        for sector in _INDUSTRY_SECTORS
-    ],
-    *[
-        f"{fuel}_to_kilnfuel_{sector}"
-        for fuel in ["hydrogen", "electricity"]
-        for sector in ["glass", "ceramic"]
-    ],
-]
-
 
 class TechnologyDiffusionMannhardt(Dataset[pd.DataFrame]):
     """
@@ -136,7 +115,6 @@ class TechnologyDiffusionMannhardt(Dataset[pd.DataFrame]):
         "oil_to_gasoline_conversion",
         "oil_to_diesel_conversion",
         "oil_to_kerosene_conversion",
-        *_INDUSTRY_HEAT_TECHNOLOGIES,
     ]
     HIGH = [
         "photovoltaics",
@@ -194,29 +172,37 @@ class TechnologyDiffusionMannhardt(Dataset[pd.DataFrame]):
         return data
 
     # -------- methods ------------------------
-    def get_category(self, technology: Technology) -> str:
+    def get_category(
+        self, technology: Technology, proxy_element_name: str | None = None
+    ) -> str:
         """
-        Get the diffusion category of a technology.
+        Get the diffusion category of a technology, or of its proxy technology.
         """
-        if technology.name not in self.categories:
+        technology_name = proxy_element_name or technology.name
+        if technology_name not in self.categories:
             raise ValueError(
-                f"No diffusion rate is available for technology '{technology.name}'."
+                f"No diffusion rate is available for technology '{technology_name}'."
             )
-        return self.categories[technology.name]
+        return self.categories[technology_name]
 
-    def get_max_diffusion_rate(self, technology: Technology) -> Attribute:
+    def get_max_diffusion_rate(
+        self, technology: Technology, proxy_element_name: str | None = None
+    ) -> Attribute:
         """
         Get the maximum diffusion rate of a technology.
+
+        With `proxy_element_name`, the technology diffuses as the proxy technology.
         """
-        category = self.get_category(technology)
+        category = self.get_category(technology, proxy_element_name)
+        proxy = f" (as {proxy_element_name})" if proxy_element_name else ""
         attr = technology.max_diffusion_rate
         attr.set_data(
             default_value=self.DIFFUSION_RATES[category],
             unit="1",
             source=SourceInformation(
                 description=(
-                    f"The maximum diffusion rate of {technology.name} is set to "
-                    f"the historically observed diffusion rate of "
+                    f"The maximum diffusion rate of {technology.name}{proxy} is set "
+                    f"to the historically observed diffusion rate of "
                     f"{self.REFERENCE_TECHNOLOGIES[category]} from Mannhardt "
                     f"et al. (2024)."
                 ),

@@ -11,9 +11,15 @@ from zen_europe.datasets.dataset_collections.industry_heat_supply import (
 )
 from zen_europe.datasets.datasets.technology.brown2018 import Brown2018
 from zen_europe.datasets.datasets.technology.mayer2024 import Mayer2024
+from zen_europe.utils.industry import heat_carrier
 
 if TYPE_CHECKING:
     from zen_creator.model import Model
+
+# (dis)charging losses neglected, own assumption
+TES_EFFICIENCY = 1.0
+# variable O&M (Euro/GWh) against spurious cycling, own assumption
+TES_OPEX_VARIABLE = 1.0
 
 
 class IndustryTES:
@@ -37,7 +43,7 @@ class IndustryTES:
         """Heat of the sector's temperature band."""
         return Attribute(
             "reference_carrier",
-            default_value=[f"heat_industry_{self.temp_level}_{self.sector}"],
+            default_value=[heat_carrier(self.temp_level, self.sector)],
             element=self,
         )
 
@@ -58,7 +64,7 @@ class IndustryTES:
     def _set_efficiency_charge(self) -> Attribute:
         """Losses neglected."""
         return self.efficiency_charge.set_data(
-            default_value=1.0,
+            default_value=TES_EFFICIENCY,
             unit="1",
             source=AssumptionInformation(description="Losses neglected."),
         )
@@ -66,7 +72,7 @@ class IndustryTES:
     def _set_efficiency_discharge(self) -> Attribute:
         """Losses neglected."""
         return self.efficiency_discharge.set_data(
-            default_value=1.0,
+            default_value=TES_EFFICIENCY,
             unit="1",
             source=AssumptionInformation(description="Losses neglected."),
         )
@@ -80,7 +86,7 @@ class IndustryTES:
     def _set_opex_specific_variable(self) -> Attribute:
         """Small cost against cycling."""
         return self.opex_specific_variable.set_data(
-            default_value=1.0,
+            default_value=TES_OPEX_VARIABLE,
             unit="Euro/GWh",
             source=AssumptionInformation(description="Against cycling."),
         )

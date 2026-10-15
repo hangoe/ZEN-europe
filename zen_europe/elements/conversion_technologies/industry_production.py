@@ -9,6 +9,7 @@ from zen_creator.utils.attribute import Attribute
 from zen_europe.datasets.dataset_collections.industry_production_data import (
     IndustryProductionData,
 )
+from zen_europe.utils.industry import heat_carrier
 
 if TYPE_CHECKING:
     from zen_creator.model import Model
@@ -24,7 +25,7 @@ class IndustryProduction:
 
     def heat_carrier(self, level: str) -> str:
         """The sector's heat carrier of the temperature band `level`."""
-        return f"heat_industry_{level}_{self.sector}"
+        return heat_carrier(level, self.sector)
 
     # ---------- Required methods that are called during object construction ----------
 

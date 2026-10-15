@@ -11,6 +11,24 @@ from .manual_methanol_demand import (WITS,
                                     ChemAnalyst)
 from .eurostat import Eurostat
 from .ipcc_emission_factors import IPCCEmissionFactors
+from .bfe_industry import (
+    BFEIndustry,
+)
+from .eurostat_energy_balance_industry import (
+    EurostatEnergyBalanceIndustry,
+)
+from .faostat_food import (
+    FAOSTATFood,
+)
+from .jrc_idees_industry import (
+    JRCIDEESIndustry,
+)
+from .rehfeldt2017 import (
+    Rehfeldt2017,
+)
+from .wolf2017 import (
+    Wolf2017,
+)
 
 __all__ = [
     "EnspresoBiomassAvailability",
@@ -25,4 +43,10 @@ __all__ = [
     "ChemAnalyst",
     "Eurostat",
     "IPCCEmissionFactors",
+    "BFEIndustry",
+    "EurostatEnergyBalanceIndustry",
+    "FAOSTATFood",
+    "JRCIDEESIndustry",
+    "Rehfeldt2017",
+    "Wolf2017",
 ]

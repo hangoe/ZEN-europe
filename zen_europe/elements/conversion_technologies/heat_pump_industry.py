@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, ClassVar
+from typing import ClassVar
 
 from zen_creator import ConversionTechnology
 from zen_creator.datasets.datasets.metadata import AssumptionInformation
@@ -9,18 +9,13 @@ from zen_creator.utils.attribute import Attribute
 from zen_europe.datasets.dataset_collections.industry_heat_supply import (
     IndustryHeatSupply,
 )
-from zen_europe.datasets.dataset_collections.technology_cost_database import (
-    TechnologyCostDatabase,
+from zen_europe.elements.conversion_technologies.industry_heat_technology import (
+    IndustryHeatTechnology,
 )
-from zen_europe.datasets.datasets.technology.technology_diffusion_mannhardt import (
-    TechnologyDiffusionMannhardt,
-)
-
-if TYPE_CHECKING:
-    from zen_creator.model import Model
+from zen_europe.utils.industry import heat_carrier
 
 
-class HeatPumpIndustry:
+class HeatPumpIndustry(IndustryHeatTechnology):
     """
     Industrial heat pump of a sector and temperature band, on waste heat or water.
 
@@ -29,15 +24,12 @@ class HeatPumpIndustry:
     technologies at the end of the module only set the combination.
     """
 
-    sector: ClassVar[str]
     temp_level: ClassVar[str]
     heat_source: ClassVar[str]
-
-    def __init__(self, model: Model, power_unit: str = "GW"):
-        super().__init__(model=model, power_unit=power_unit)
+    diffusion_proxy: ClassVar[str] = "heat_pump_DH"
 
     @property
-    def cost_proxy(self) -> str:
+    def cost_proxy(self) -> str:  # type: ignore[override]
         """DEA heat pumps up to 125 °C and 150 °C; the latter also for 150-200 °C."""
         if self.temp_level == "0_100":
             return "heat_pump_industry_125"
@@ -65,25 +57,9 @@ class HeatPumpIndustry:
         """Half the Carnot COP."""
         return self._supply().get_conversion_factor_heat_pump(self)
 
-    def _set_lifetime(self) -> Attribute:
-        """Lifetime from DEA."""
-        return self._cost_db().get_lifetime(self, proxy_element_name=self.cost_proxy)
-
     def _set_capex_specific_conversion(self) -> Attribute:
         """Investment cost from DEA, plus waste-heat recovery."""
         return self._supply().get_capex_specific_conversion_heat_pump(self)
-
-    def _set_opex_specific_fixed(self) -> Attribute:
-        """Fixed O&M cost from DEA."""
-        return self._cost_db().get_opex_specific_fixed(
-            self, proxy_element_name=self.cost_proxy
-        )
-
-    def _set_opex_specific_variable(self) -> Attribute:
-        """Variable O&M cost from DEA."""
-        return self._cost_db().get_opex_specific_variable(
-            self, proxy_element_name=self.cost_proxy
-        )
 
     def _set_capacity_existing(self) -> Attribute:
         """No industrial heat pumps today."""
@@ -103,29 +79,11 @@ class HeatPumpIndustry:
         """Seed from the district heating heat pumps."""
         return self._supply().get_capacity_addition_unbounded_heat_pump(self)
 
-    def _set_construction_time(self) -> Attribute:
-        """Construction time from DEA."""
-        if not self.settings.investment.use_construction_times:
-            return self.construction_time
-        return self._cost_db().get_construction_time(
-            self, proxy_element_name=self.cost_proxy
-        )
-
-    def _set_max_diffusion_rate(self) -> Attribute:
-        """Max diffusion rate, as the district heating heat pumps."""
-        if not self.settings.investment.use_diffusion_rates:
-            return self.max_diffusion_rate
-        diffusion_rates = TechnologyDiffusionMannhardt(source_path=self.source_path)
-        return diffusion_rates.get_max_diffusion_rate(self)
-
     def _heat(self) -> str:
-        return f"heat_industry_{self.temp_level}_{self.sector}"
+        return heat_carrier(self.temp_level, self.sector)
 
     def _supply(self) -> IndustryHeatSupply:
         return IndustryHeatSupply(self.settings, self.source_path)
-
-    def _cost_db(self) -> TechnologyCostDatabase:
-        return TechnologyCostDatabase(self.settings, self.source_path)
 
 
 class HeatPumpIndustry0100WasteHeatGlass(HeatPumpIndustry, ConversionTechnology):

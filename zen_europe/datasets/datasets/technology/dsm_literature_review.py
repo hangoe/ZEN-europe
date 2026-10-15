@@ -33,8 +33,11 @@ CATEGORY_PARAMETERS = {
     2: {"capex": 20.0, "opex": 20.0, "energy_to_power_ratio_max": 48.0},
     3: {"capex": 1.0, "opex": 1.0, "energy_to_power_ratio_max": 336.0},
 }
-# lower heating value (GJ/t) of the carriers modeled on an energy basis
-LOWER_HEATING_VALUE = {"ammonia": 18.6, "methanol": 19.9}
+# energy content (GWh/t) of the carriers modeled on an energy basis
+ENERGY_CONTENT = {
+    "ammonia": Constants.AMMONIA_GWH_PER_TON,
+    "methanol": Constants.METHANOL_KWH_PER_KG / 1000,  # kWh/kg -> GWh/t
+}
 
 
 class DSMLiteratureReview(Dataset[pd.DataFrame]):
@@ -54,8 +57,7 @@ class DSMLiteratureReview(Dataset[pd.DataFrame]):
             publication_year=2026,
             note=(
                 "Based on Golmohamadi (2021), doi:10.1016/j.rser.2021.111963, and "
-                "Boldrini et al. (2024), doi:10.1016/j.rser.2023.113988. LHVs from "
-                "IEA-AMF (ammonia) and the Engineering ToolBox (methanol)."
+                "Boldrini et al. (2024), doi:10.1016/j.rser.2023.113988."
             ),
         )
 
@@ -92,11 +94,9 @@ class DSMLiteratureReview(Dataset[pd.DataFrame]):
     def _get_cost(self, element: IndustryDSM, parameter: str) -> float:
         """Cost per tonne, per GWh for the carriers modeled on an energy basis."""
         cost = self._get_parameters(element)[parameter]
-        if element.carrier not in LOWER_HEATING_VALUE:
+        if element.carrier not in ENERGY_CONTENT:
             return cost
-        return cost / (
-            LOWER_HEATING_VALUE[element.carrier] / Constants.SECONDS_PER_HOUR
-        )
+        return cost / ENERGY_CONTENT[element.carrier]
 
     def _get_parameters(self, element: IndustryDSM) -> dict[str, float]:
         shiftability = element.settings.industry.dsm_shiftability

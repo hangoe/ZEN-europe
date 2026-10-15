@@ -13,7 +13,6 @@ from zen_europe.datasets.dataset_collections.industry_heat_supply import (
     IndustryHeatSupply,
 )
 from zen_europe.datasets.dataset_collections.industry_production_data import (
-    SECTORS,
     IndustryProductionData,
 )
 from zen_europe.datasets.datasets.carrier.rehfeldt2017 import Rehfeldt2017
@@ -27,13 +26,16 @@ from zen_europe.datasets.datasets.technology.jrc_bat_paper import JRCBATPaper
 from zen_europe.datasets.datasets.technology.jrc_eu_times_industry import (
     JRCEUTIMESIndustry,
 )
-
+from zen_europe.utils.constants import Constants
+from zen_europe.utils.industry import SECTORS
 from zen_europe.utils.utils import (
     calculate_capacity_addition_from_cumulative,
     format_capacity_existing,
 )
 
 from .conftest import RAW_DATA_PATH
+
+NODES = tuple(Settings().region.set_nodes)
 
 
 @pytest.fixture(scope="module")
@@ -87,9 +89,9 @@ def test_kiln_fuel_only_for_glass_and_ceramic(
 
 
 def test_demand_of_nodes_without_jrc_idees(production: IndustryProductionData) -> None:
-    glass = production.calculate_demand("glass")
+    glass = production.calculate_demand("glass", NODES)
     assert glass["CH"] == glass["AT"] and glass["NO"] == glass["FI"]
-    paper = production.calculate_demand("paper")
+    paper = production.calculate_demand("paper", NODES)
     consumption = JRCBATPaper(RAW_DATA_PATH).get_consumption()
     hours = production.settings.industry.operating_hours
     assert paper["UK"] == pytest.approx(consumption["UK"] * 1000 / hours)
@@ -98,13 +100,13 @@ def test_demand_of_nodes_without_jrc_idees(production: IndustryProductionData) -
 def test_boiler_capacity_matches_demand_and_fuel_totals(
     heat_supply: IndustryHeatSupply, production: IndustryProductionData
 ) -> None:
-    capacity = heat_supply._boiler_capacity
+    capacity = heat_supply._calculate_boiler_capacity(NODES)
     demand = pd.DataFrame({
-        s: production.calculate_demand(s)
+        s: production.calculate_demand(s, NODES)
         * production.calculate_energy_intensity(s)["heat"]
         for s in SECTORS
     })
-    pooled = heat_supply._calculate_boiler_fuel_shares()
+    pooled = heat_supply._calculate_boiler_fuel_shares(NODES)
     for node in ("DE", "SE", "CH"):
         node_capacity = capacity.xs(node, level="node")
         assert node_capacity.sum(axis=1)[list(SECTORS)].to_numpy() == pytest.approx(
@@ -128,14 +130,15 @@ def test_capacity_existing_uses_shared_vintages(
         lifetime=SimpleNamespace(default_value=20),
         construction_time=SimpleNamespace(default_value=0),
     )
-    capacity = production._capacity["glass"].to_frame(reference_year - 1)
+    capacity = production._calculate_capacity(NODES)["glass"].to_frame(
+        reference_year - 1)
     vintages = format_capacity_existing(
         calculate_capacity_addition_from_cumulative(capacity, element)  # type: ignore[arg-type]
     )
     years = vintages.index.get_level_values("year_construction")
     assert years.max() == reference_year - 1
     assert vintages.groupby(level="node").sum()["DE"] == pytest.approx(
-        production.calculate_demand("glass")["DE"]
+        production.calculate_demand("glass", NODES)["DE"]
     )
 
 
@@ -154,7 +157,8 @@ def test_dsm_shiftability() -> None:
     assert cost("ceramic", "optimistic") == 20.0
     assert cost("ceramic", "pessimistic") == 1000.0
     # energy basis: per GWh instead of per tonne
-    assert cost("ammonia", "optimistic") == pytest.approx(20.0 / (18.6 / 3600))
+    assert cost("ammonia", "optimistic") == pytest.approx(
+        20.0 / Constants.AMMONIA_GWH_PER_TON)
 
 
 def test_tes_self_discharge_brown2018() -> None:

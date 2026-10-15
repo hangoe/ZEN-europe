@@ -9,9 +9,13 @@ from zen_creator.utils.attribute import Attribute
 from zen_europe.datasets.dataset_collections.industry_heat_supply import (
     IndustryHeatSupply,
 )
+from zen_europe.utils.industry import heat_carrier
 
 if TYPE_CHECKING:
     from zen_creator.model import Model
+
+# lifetime of the heat exchanger (yr), own assumption
+HEAT_EXCHANGER_LIFETIME = 30
 
 
 class HeatIndustryTempConversion:
@@ -23,7 +27,7 @@ class HeatIndustryTempConversion:
     # bands whose demand flows through the technology
     served_levels: ClassVar[tuple[str, ...]]
 
-    def __init__(self, model: Model, power_unit: str = "GW"):
+    def __init__(self, model: Model, power_unit: str = "MW"):
         super().__init__(model=model, power_unit=power_unit)
 
     # ---------- Required methods that are called during object construction ----------
@@ -64,7 +68,7 @@ class HeatIndustryTempConversion:
     def _set_lifetime(self) -> Attribute:
         """Lifetime of a heat exchanger."""
         return self.lifetime.set_data(
-            default_value=30,
+            default_value=HEAT_EXCHANGER_LIFETIME,
             unit="1",
             source=AssumptionInformation(description="Lifetime of a heat exchanger."),
         )
@@ -98,7 +102,7 @@ class HeatIndustryTempConversion:
         ).get_capacity_limit_temp_conversion(self)
 
     def _heat(self, level: str) -> str:
-        return f"heat_industry_{level}_{self.sector}"
+        return heat_carrier(level, self.sector)
 
 
 class HeatIndustryTempConversion150(HeatIndustryTempConversion):

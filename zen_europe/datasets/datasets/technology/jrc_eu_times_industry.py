@@ -15,7 +15,6 @@ PARAMETERS = {
     "FIXOM": "FIXOM",
     "VAROM": "VAROM",
     "LIFE": "LIFE",
-    "EMISSIONS~INDCO2P": "EMISSIONS_INDCO2P",
 }
 
 
@@ -52,7 +51,7 @@ class JRCEUTIMESIndustry(Dataset[pd.DataFrame]):
         )
 
     def _set_data(self) -> pd.DataFrame:
-        sheet = pd.read_excel(self.path, sheet_name="IND", header=None, engine="calamine")
+        sheet = pd.read_excel(self.path, sheet_name="IND", header=None)
         sheet.columns = sheet.iloc[HEADER_ROW]
         sheet = sheet.iloc[HEADER_ROW + 1:]
         # a process spans several rows, only the first one holds its name

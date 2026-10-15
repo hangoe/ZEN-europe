@@ -12,11 +12,14 @@ from zen_europe.datasets.dataset_collections.industry_production_data import (
 from zen_europe.datasets.dataset_collections.technology_cost_database import (
     TechnologyCostDatabase,
 )
+from zen_europe.datasets.datasets.technology.technology_diffusion_mannhardt import (
+    TechnologyDiffusionMannhardt,
+)
 
 if TYPE_CHECKING:
     from zen_creator.model import Model
 
-# same DEA capture unit as the cement kiln
+# costs and diffusion of the same DEA capture unit as the cement kiln
 COST_PROXY = "cement_post_comb"
 
 
@@ -107,12 +110,9 @@ class IndustryPostComb:
         """As cement_post_comb."""
         if not self.settings.investment.use_diffusion_rates:
             return self.max_diffusion_rate
-        return self.max_diffusion_rate.set_data(
-            default_value=self.model.elements[
-                "cement_post_comb"
-            ].max_diffusion_rate.default_value,
-            unit="1",
-            source=AssumptionInformation(description="As cement_post_comb."),
+        diffusion_rates = TechnologyDiffusionMannhardt(source_path=self.source_path)
+        return diffusion_rates.get_max_diffusion_rate(
+            self, proxy_element_name=COST_PROXY
         )
 
     def _data(self) -> IndustryProductionData:
