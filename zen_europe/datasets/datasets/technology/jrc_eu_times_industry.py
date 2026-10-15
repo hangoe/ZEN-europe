@@ -37,7 +37,11 @@ class JRCEUTIMESIndustry(Dataset[pd.DataFrame]):
             author=["European Commission, Joint Research Centre"],
             publication="JRC-EU-TIMES",
             publication_year=2019,
-            note="JRC_EU_TIMES_model_input.xls, sheet IND.",
+            doi="10.2790/97596",
+            note=(
+                "JRC_EU_TIMES_model_input.xls (2019.11), sheet IND. The DOI is the "
+                "one of the model description (2013)."
+            ),
         )
 
     def _set_path(self) -> Path:

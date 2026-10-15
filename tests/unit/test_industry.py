@@ -15,6 +15,7 @@ from zen_europe.datasets.dataset_collections.industry_heat_supply import (
 from zen_europe.datasets.dataset_collections.industry_production_data import (
     IndustryProductionData,
 )
+from zen_europe.datasets.datasets.carrier.jrc_bat_paper import JRCBATPaper
 from zen_europe.datasets.datasets.carrier.rehfeldt2017 import Rehfeldt2017
 from zen_europe.datasets.datasets.carrier.wolf2017 import Wolf2017
 from zen_europe.datasets.datasets.technology.brown2018 import Brown2018
@@ -22,7 +23,6 @@ from zen_europe.datasets.datasets.technology.dsm_literature_review import (
     CATEGORIES,
     DSMLiteratureReview,
 )
-from zen_europe.datasets.datasets.technology.jrc_bat_paper import JRCBATPaper
 from zen_europe.datasets.datasets.technology.jrc_eu_times_industry import (
     JRCEUTIMESIndustry,
 )

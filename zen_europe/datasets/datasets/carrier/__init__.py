@@ -14,14 +14,11 @@ from .ipcc_emission_factors import IPCCEmissionFactors
 from .bfe_industry import (
     BFEIndustry,
 )
-from .eurostat_energy_balance_industry import (
-    EurostatEnergyBalanceIndustry,
-)
 from .faostat_food import (
     FAOSTATFood,
 )
-from .jrc_idees_industry import (
-    JRCIDEESIndustry,
+from .jrc_bat_paper import (
+    JRCBATPaper,
 )
 from .rehfeldt2017 import (
     Rehfeldt2017,
@@ -44,9 +41,8 @@ __all__ = [
     "Eurostat",
     "IPCCEmissionFactors",
     "BFEIndustry",
-    "EurostatEnergyBalanceIndustry",
     "FAOSTATFood",
-    "JRCIDEESIndustry",
+    "JRCBATPaper",
     "Rehfeldt2017",
     "Wolf2017",
 ]

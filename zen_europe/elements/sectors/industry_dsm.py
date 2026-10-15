@@ -18,7 +18,9 @@ class IndustryDSMSector(Sector):
     """Demand-side management of industrial products."""
 
     name = "industry_dsm"
-    required_sectors = ["industry_heat", "ammonia", "cement", "methanol", "steel"]
+    # every DSM is also listed by the sector of its product and is only added
+    # when that sector is active as well
+    required_sectors = []
 
     def __init__(self) -> None:
         super().__init__()

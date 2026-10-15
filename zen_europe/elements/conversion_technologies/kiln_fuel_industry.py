@@ -3,13 +3,19 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, ClassVar
 
 from zen_creator import ConversionTechnology
-from zen_creator.datasets.datasets.metadata import AssumptionInformation
+from zen_creator.datasets.datasets.metadata import (
+    AssumptionInformation,
+    SourceInformation,
+)
 from zen_creator.utils.attribute import Attribute
 
 from zen_europe.datasets.dataset_collections.industry_heat_supply import (
     IndustryHeatSupply,
 )
 from zen_europe.datasets.datasets.carrier.aidres import Aidres
+from zen_europe.datasets.datasets.technology.cement_production_gardarsdottir import (
+    CementProductionGardarsdottir,
+)
 from zen_europe.datasets.datasets.technology.technology_diffusion_mannhardt import (
     TechnologyDiffusionMannhardt,
 )
@@ -63,16 +69,16 @@ class KilnFuelIndustry:
 
         The fuel supply is tied to the operation of the kiln.
         """
-        cement_kiln = self.model.conversion_technologies["cement_kiln"]
-        return self.lifetime.set_data(
-            default_value=cement_kiln.lifetime.default_value,
-            unit=cement_kiln.lifetime.unit,
-            source=AssumptionInformation(
+        gardarsdottir = CementProductionGardarsdottir(source_path=self.source_path)
+        return gardarsdottir.get_lifetime(self).set_data(
+            source=SourceInformation(
                 description=(
                     "The lifetime of the kiln fuel technologies is the lifetime of "
-                    "the cement kiln, as for the cement fuel technologies, since the "
-                    "fuel supply is tied to the operation of the kiln."
-                )
+                    "the cement kiln (Gardarsdottir et al. (2019)), as for the cement "
+                    "fuel technologies, since the fuel supply is tied to the "
+                    "operation of the kiln."
+                ),
+                metadata=gardarsdottir.metadata,
             ),
         )
 

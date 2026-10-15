@@ -13,7 +13,8 @@ from zen_creator.datasets.datasets.metadata import (
 
 from zen_europe.datasets.datasets.carrier.aidres import Aidres
 from zen_europe.datasets.datasets.carrier.faostat_food import FAOSTATFood
-from zen_europe.datasets.datasets.carrier.jrc_idees_industry import JRCIDEESIndustry
+from zen_europe.datasets.datasets.carrier.jrc_bat_paper import JRCBATPaper
+from zen_europe.datasets.datasets.carrier.jrc_idees import JRCIDEES
 from zen_europe.datasets.datasets.carrier.rehfeldt2017 import Rehfeldt2017
 from zen_europe.datasets.datasets.carrier.wolf2017 import Wolf2017
 from zen_europe.datasets.datasets.financial.dea import DEA
@@ -21,7 +22,6 @@ from zen_europe.datasets.datasets.financial.ECB import ECBInflation
 from zen_europe.datasets.datasets.technology.cement_production_gardarsdottir import (
     CementProductionGardarsdottir,
 )
-from zen_europe.datasets.datasets.technology.jrc_bat_paper import JRCBATPaper
 from zen_europe.datasets.datasets.technology.jrc_eu_times_industry import (
     BASE_YEAR,
     JRCEUTIMESIndustry,
@@ -77,6 +77,21 @@ FOOD_ITEMS = {
 }
 # process CO2 (t/t), see docs, "Production technologies"
 CARBON_INTENSITY = {"glass": 0.1, "ceramic": 0.064234, "paper": 0.0, "food": 0.0}
+CARBON_INTENSITY_ASSUMPTIONS = {
+    "glass": (
+        "Assumed from the direct (raw-material decomposition) emissions of the "
+        "electrified glass routes in AIDRES (2023), Tables 19, 21 and 23 (0.07-0.23 "
+        "t/t), doi:10.2833/696697."
+    ),
+    "ceramic": (
+        "Process emissions are 15 % of the total emissions (JRC, Best Available "
+        "Techniques Reference Document for the Ceramic Manufacturing Industry, Final "
+        "Draft, April 2026); the combustion emissions are 8.036 GJ/t x 0.0453 t/GJ "
+        "(fuel-mix weighted), so the process emissions are 0.364 x 15/85 t/t."
+    ),
+    "paper": "No process emissions, only combustion emissions.",
+    "food": "No process emissions, only combustion emissions.",
+}
 # share of the kiln natural gas that can switch fuel, see docs, "Kiln fuel switching"
 KILN_SWITCHABLE_SHARE = {"glass": 1.0, "ceramic": 46.26 / 47.49}
 # literature capex of paper (Euro/(t/a)), see docs, "Paper"
@@ -102,7 +117,7 @@ class IndustryProductionData(DatasetCollection):
             "rehfeldt2017": Rehfeldt2017(self.source_path),
             "aidres": Aidres(self.source_path),
             "wolf2017": Wolf2017(self.source_path),
-            "jrc_idees_industry": JRCIDEESIndustry(self.source_path),
+            "jrc_idees": JRCIDEES(self.source_path),
             "faostat_food": FAOSTATFood(self.source_path),
             "jrc_bat_paper": JRCBATPaper(self.source_path),
             "jrc_eu_times_industry": JRCEUTIMESIndustry(self.source_path),
@@ -194,7 +209,13 @@ class IndustryProductionData(DatasetCollection):
                     "AIDRES (2023) routes, weighted by EU production share). Heat "
                     "below 200 °C is split into temperature bands with the Rehfeldt "
                     "temperature distribution and, for 100-200 °C, with Wolf (2017); "
-                    "the rest is fuel, split by the JRC-IDEES fuel mix."
+                    "the rest is fuel, split by the JRC-IDEES fuel mix. The natural "
+                    "gas of glass and ceramic is supplied as kiln fuel; for ceramic, "
+                    "an assumed 97.4 % of it can switch fuel, since the ceramic BREF "
+                    "(JRC, Final Draft, April 2026, Sections 4.2.1-4.2.3) limits "
+                    "electrified kilns to below 1600 °C and the > 1000 °C share of "
+                    "technical ceramics in Rehfeldt et al. (2017) is treated as not "
+                    "switchable."
                 ),
                 metadata=self.metadata,
             ),
@@ -226,7 +247,7 @@ class IndustryProductionData(DatasetCollection):
             return self._get_ceramic_cost(element, "get_lifetime")
         return element.lifetime.set_data(
             default_value=float(self._costs.at[element.sector, "lifetime"]),
-            source=self._cost_source(element.sector),
+            source=self._cost_source(element.sector, "lifetime"),
         )
 
     def get_capex_specific_conversion(self, element: Element) -> Attribute:
@@ -236,7 +257,7 @@ class IndustryProductionData(DatasetCollection):
         return element.capex_specific_conversion.set_data(
             default_value=float(self._costs.at[element.sector, "capex"]),
             unit="Euro/(tproduct/h)",
-            source=self._cost_source(element.sector),
+            source=self._cost_source(element.sector, "capex"),
         )
 
     def get_opex_specific_fixed(self, element: Element) -> Attribute:
@@ -246,7 +267,7 @@ class IndustryProductionData(DatasetCollection):
         return element.opex_specific_fixed.set_data(
             default_value=float(self._costs.at[element.sector, "opex_fixed"]),
             unit="Euro/(tproduct/h)",
-            source=self._cost_source(element.sector),
+            source=self._cost_source(element.sector, "opex_fixed"),
         )
 
     def get_opex_specific_variable(self, element: Element) -> Attribute:
@@ -256,7 +277,7 @@ class IndustryProductionData(DatasetCollection):
         return element.opex_specific_variable.set_data(
             default_value=float(self._costs.at[element.sector, "opex_variable"]),
             unit="Euro/tproduct",
-            source=self._cost_source(element.sector),
+            source=self._cost_source(element.sector, "opex_variable"),
         )
 
     def get_carbon_intensity_technology(self, element: Element) -> Attribute:
@@ -265,13 +286,13 @@ class IndustryProductionData(DatasetCollection):
         return element.carbon_intensity_technology.set_data(
             default_value=float(intensity),
             unit="ton/tproduct",
-            source=SourceInformation(
+            source=AssumptionInformation(
                 description=(
                     f"The process CO2 emissions of {element.sector} production are "
-                    f"{intensity} t per t of product, see docs, 'Production "
-                    "technologies'."
+                    f"{intensity} t per t of product. "
+                    + CARBON_INTENSITY_ASSUMPTIONS[element.sector]
+                    + " See docs, 'Production technologies'."
                 ),
-                metadata=self.metadata,
             ),
         )
 
@@ -379,8 +400,8 @@ class IndustryProductionData(DatasetCollection):
 
     def calculate_fuel_shares(self, sector: str) -> pd.Series:
         """Fuel mix of the sector's thermal energy (EU27), small fuels dropped."""
-        idees = cast(JRCIDEESIndustry, self.data["jrc_idees_industry"])
-        thermal = idees.get_thermal_final_energy(
+        idees = cast(JRCIDEES, self.data["jrc_idees"])
+        thermal = idees.get_industry_thermal_final_energy(
             sector, self.settings.industry.data_year).loc[IDEES_EU]
         shares = thermal / thermal.sum()
         shares = shares[shares.index.isin(list(FUELS))]
@@ -412,14 +433,14 @@ class IndustryProductionData(DatasetCollection):
         sector."""
         hours = self.settings.industry.operating_hours
         year = self.settings.industry.data_year
-        idees = cast(JRCIDEESIndustry, self.data["jrc_idees_industry"])
+        idees = cast(JRCIDEES, self.data["jrc_idees"])
         capacity = pd.DataFrame({
             "glass": self._fill_proxy_nodes(
                 self._reindex_nodes(
-                    idees.get_installed_capacity("glass", year), nodes)),
+                    idees.get_industry_installed_capacity("glass", year), nodes)),
             "ceramic": self._calculate_ceramic_output(nodes),
             "paper": self._reindex_nodes(
-                idees.get_installed_capacity("paper", year), nodes),
+                idees.get_industry_installed_capacity("paper", year), nodes),
         }) * 1000 / hours  # kt/a -> t/h
         capacity["food"] = self._calculate_food_capacity(nodes)
         # paper: the consumption of the nodes without JRC-IDEES (JRC BAT)
@@ -432,13 +453,14 @@ class IndustryProductionData(DatasetCollection):
     def _calculate_production(self, nodes: tuple[str, ...]) -> pd.DataFrame:
         """Physical production (t/h) averaged over the year, per node and sector."""
         year = self.settings.industry.data_year
-        idees = cast(JRCIDEESIndustry, self.data["jrc_idees_industry"])
+        idees = cast(JRCIDEES, self.data["jrc_idees"])
         production = pd.DataFrame({
             "glass": self._fill_proxy_nodes(
-                self._reindex_nodes(idees.get_physical_output("glass", year), nodes)),
+                self._reindex_nodes(
+                    idees.get_industry_physical_output("glass", year), nodes)),
             "ceramic": self._calculate_ceramic_output(nodes),
             "paper": self._reindex_nodes(
-                idees.get_physical_output("paper", year), nodes),
+                idees.get_industry_physical_output("paper", year), nodes),
         }) * 1000.0 / Constants.HOURS_PER_YEAR  # kt/a -> t/h
         production["food"] = self._calculate_food_capacity(nodes)
         return production
@@ -446,8 +468,8 @@ class IndustryProductionData(DatasetCollection):
     @cache
     def _calculate_ceramic_output(self, nodes: tuple[str, ...]) -> pd.Series:
         """Ceramic output (kt/a): JRC-IDEES thermal energy / Rehfeldt fuel intensity."""
-        idees = cast(JRCIDEESIndustry, self.data["jrc_idees_industry"])
-        thermal = idees.get_thermal_final_energy(
+        idees = cast(JRCIDEES, self.data["jrc_idees"])
+        thermal = idees.get_industry_thermal_final_energy(
             "ceramic", self.settings.industry.data_year).sum(axis=1)  # ktoe
         intensity = self._sector_parameters.at["ceramic", "fuel_total"]  # GJ/t
         output = thermal * Constants.GJ_PER_KTOE / (intensity * 1000)
@@ -560,11 +582,54 @@ class IndustryProductionData(DatasetCollection):
             CementProductionGardarsdottir, self.data["cement_production_gardarsdottir"])
         return getattr(gardarsdottir, method)(element).set_data(
             source=AssumptionInformation(
-                description="The cement plant is a proxy for ceramic production."
+                description=(
+                    "No cost data for ceramic production exist; the cement clinker "
+                    "plant of Gardarsdottir et al. (2019), Comparison of Technologies "
+                    "for CO2 Capture from Cement Production - Part 2: Cost Analysis, "
+                    "Energies 12, 542, doi:10.3390/en12030542, is used as a proxy for "
+                    "a kiln-fired mineral product."
+                )
             ),
         )
 
-    def _cost_source(self, sector: str) -> SourceInformation:
+    def _cost_source(
+        self, sector: str, attribute: str
+    ) -> SourceInformation | AssumptionInformation:
+        """Source of a cost or the lifetime of a production technology."""
+        inflation = (
+            f"Costs in {self.settings.time.reference_year} Euro using ECB HICP "
+            "inflation, see docs, 'Production technologies'."
+        )
+        if sector == "food":
+            return AssumptionInformation(
+                description=(
+                    "No consistent food cost data exist. Capex of "
+                    f"{FOOD_COSTS['capex']} Euro/(t/a), fixed opex of "
+                    f"{FOOD_COSTS['opex_fixed']} Euro/(t/a), no variable opex and a "
+                    f"lifetime of {FOOD_COSTS['lifetime']} years "
+                    "are rounded from three mid-sized JRC-EU-TIMES processes (hollow "
+                    "glass, quicklime, copper finishing), as food plants are mostly "
+                    "low-temperature processing lines (JRC-EU-TIMES, "
+                    f"doi:10.2790/97596). {inflation}"
+                ),
+            )
+        if sector == "paper" and attribute == "capex":
+            return AssumptionInformation(
+                description=(
+                    f"Capex of {PAPER_CAPEX} Euro/(t/a) (not inflated), a lower bound "
+                    "from brownfield conversions, since JRC-EU-TIMES (about 2,283 "
+                    "Euro/(t/a)) describes an integrated greenfield mill: Stora Enso "
+                    "Oulu (about 1,333 Euro/(t/a), https://www.storaenso.com/en/"
+                    "newsroom/regulatory-and-investor-releases/2022/10/stora-enso-"
+                    "invests-in-conversion-to-accelerate-growth-in-renewable-"
+                    "packaging), Stora Enso Langerbrugge (about 571 Euro/(t/a), "
+                    "https://paperage.com/2022news/06-07-2022stora-enso-langerbrugge-"
+                    "conversion.html) and Kotkamills BM2 (about 425-450 Euro/(t/a), "
+                    "https://www.asiapapermarkets.com/kotkamills-starts-up-new-"
+                    "consumer-board-machine-bm2-in-finland-capacity-400000-tyr-of-"
+                    "nordic-folding-boxboard-and-recyclable-barrier-board/)."
+                ),
+            )
         descriptions = {
             "glass": (
                 "JRC-EU-TIMES costs and lifetime of the glass processes, weighted by "
@@ -572,20 +637,10 @@ class IndustryProductionData(DatasetCollection):
             ),
             "paper": (
                 "JRC-EU-TIMES costs and lifetime of the paper processes, weighted by "
-                "the Rehfeldt et al. (2017) activity; capex of "
-                f"{PAPER_CAPEX} Euro/(t/a) from the literature (not inflated)."
-            ),
-            "food": (
-                f"Capex of {FOOD_COSTS['capex']} Euro/(t/a) and fixed opex of "
-                f"{FOOD_COSTS['opex_fixed']} Euro/(t/a) from the literature, "
-                f"lifetime of {FOOD_COSTS['lifetime']} years."
+                "the Rehfeldt et al. (2017) activity."
             ),
         }
         return SourceInformation(
-            description=(
-                f"{descriptions[sector]} Costs in "
-                f"{self.settings.time.reference_year} Euro using ECB HICP inflation, "
-                "see docs, 'Production technologies'."
-            ),
+            description=f"{descriptions[sector]} {inflation}",
             metadata=self.metadata,
         )

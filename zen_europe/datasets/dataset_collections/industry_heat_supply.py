@@ -8,7 +8,10 @@ from typing import TYPE_CHECKING, Any, cast
 import numpy as np
 import pandas as pd
 from zen_creator import Attribute, DatasetCollection
-from zen_creator.datasets.datasets.metadata import SourceInformation
+from zen_creator.datasets.datasets.metadata import (
+    AssumptionInformation,
+    SourceInformation,
+)
 
 from zen_europe.datasets.dataset_collections.industry_production_data import (
     IDEES_EU,
@@ -19,10 +22,8 @@ from zen_europe.datasets.dataset_collections.technology_cost_database import (
     TechnologyCostDatabase,
 )
 from zen_europe.datasets.datasets.carrier.bfe_industry import BFEIndustry
-from zen_europe.datasets.datasets.carrier.eurostat_energy_balance_industry import (
-    EurostatEnergyBalanceIndustry,
-)
-from zen_europe.datasets.datasets.carrier.jrc_idees_industry import JRCIDEESIndustry
+from zen_europe.datasets.datasets.carrier.eurostat import Eurostat
+from zen_europe.datasets.datasets.carrier.jrc_idees import JRCIDEES
 from zen_europe.utils.industry import (
     BOILER_FUELS,
     HEAT_LEVELS,
@@ -86,11 +87,9 @@ class IndustryHeatSupply(DatasetCollection):
             "industry_production_data": IndustryProductionData(
                 self.settings, self.source_path
             ),
-            "eurostat_energy_balance_industry": EurostatEnergyBalanceIndustry(
-                self.source_path
-            ),
+            "eurostat": Eurostat(self.settings, self.source_path),
             "bfe_industry": BFEIndustry(self.source_path),
-            "jrc_idees_industry": JRCIDEESIndustry(self.source_path),
+            "jrc_idees": JRCIDEES(self.source_path),
             "technology_cost_database": TechnologyCostDatabase(
                 self.settings, self.source_path
             ),
@@ -122,12 +121,13 @@ class IndustryHeatSupply(DatasetCollection):
             source=SourceInformation(
                 description=(
                     "The existing boiler capacity equals the sector's heat demand "
-                    "(100-200 °C), split by fuel with an iterative proportional fit "
+                    "(0-200 °C), split by fuel with an iterative proportional fit "
                     "of the sectors' JRC-IDEES fuel mix to the node's gross heat "
                     "production per fuel (Eurostat, BFE for CH). Boilers below "
-                    f"{self.settings.industry.min_boiler_capacity} GW per node are "
-                    "dropped; the capacity is assumed to be built evenly over the "
-                    "lifetime of the technology."
+                    f"{self.settings.industry.min_boiler_capacity} GW per node "
+                    "(setting industry.min_boiler_capacity) are dropped; the "
+                    "capacity is assumed to be built evenly over the lifetime of the "
+                    "technology."
                 ),
                 metadata=self.metadata,
             ),
@@ -144,13 +144,17 @@ class IndustryHeatSupply(DatasetCollection):
             default_value=[
                 {"electricity": {"default_value": round(1.0 / cop, 12), "unit": "GW/GW"}}
             ],
-            source=SourceInformation(
+            source=AssumptionInformation(
                 description=(
                     f"The COP of {cop} is {CARNOT_EFFICIENCY:.0%} of the Carnot COP "
                     f"between the source ({source - 273.15:.0f} °C) and the centre "
-                    f"of the temperature band ({supply - 273.15:.0f} °C)."
+                    f"of the temperature band ({supply - 273.15:.0f} °C). Carnot "
+                    "fraction and source temperatures are assumptions based on Bever "
+                    "et al. (2024), High-Temperature Heat Pumps for Industrial Use, "
+                    "Chemie Ingenieur Technik, doi:10.1002/cite.202300241, and Agora "
+                    "Energiewende and Fraunhofer IEG (2023), Roll-out von "
+                    "Großwärmepumpen in Deutschland."
                 ),
-                metadata=self.metadata,
             ),
         )
 
@@ -166,13 +170,16 @@ class IndustryHeatSupply(DatasetCollection):
         return capex.set_data(
             default_value=capex.default_value + WASTE_HEAT_RECOVERY_CAPEX,
             df=None if capex.df is None else capex.df + WASTE_HEAT_RECOVERY_CAPEX,
-            source=SourceInformation(
+            source=AssumptionInformation(
                 description=(
-                    f"The DEA investment cost of '{element.cost_proxy}' plus "
-                    f"{WASTE_HEAT_RECOVERY_CAPEX} Euro/kW for the waste-heat recovery "
-                    "(Stark et al. (2025), Joule 9, 102157, Table 2)."
+                    f"The DEA investment cost of '{element.cost_proxy}' (Danish Energy "
+                    "Agency, Technology Data for Industrial Process Heat, "
+                    "https://www.ens.dk/technologydata) plus an assumed "
+                    f"{WASTE_HEAT_RECOVERY_CAPEX} Euro/kW for the waste-heat recovery, "
+                    "within the range of 1,234-1,645 Euro/kW in Stark et al. (2025), "
+                    "Waste heat is mostly a waste of time, Joule 9, 102157, Table 2, "
+                    "doi:10.1016/j.joule.2025.102157."
                 ),
-                metadata=self.metadata,
             ),
         )
 
@@ -211,8 +218,8 @@ class IndustryHeatSupply(DatasetCollection):
             source=SourceInformation(
                 description=(
                     description
-                    + f"{years[0]}: at most {first_share:.0%} of band demand per node, "
-                    "split by heat source."
+                    + f"{years[0]}: at most {first_share:.0%} of band demand per node "
+                    "(setting industry.hp_share_first_year), split by heat source."
                 ),
                 metadata=self.metadata,
             ),
@@ -236,9 +243,9 @@ class IndustryHeatSupply(DatasetCollection):
             unit="GW",
             source=SourceInformation(
                 description=(
-                    f"Annual build-out of the DH heat pumps (fleet / {seed_years} yr) "
-                    "per period, split by sector-band demand share, heat source and "
-                    "node, see docs, 'Diffusion'."
+                    f"Annual build-out of the DH heat pumps (fleet / {seed_years} yr, "
+                    "setting industry.hp_seed_years) per period, split by sector-band "
+                    "demand share, heat source and node, see docs, 'Diffusion'."
                 ),
                 metadata=self.metadata,
             ),
@@ -288,7 +295,8 @@ class IndustryHeatSupply(DatasetCollection):
                 description=(
                     "The flat heat demand of the storage's band and all lower bands "
                     "(reachable via the temperature cascade) times the capacity limit "
-                    f"margin of {margin}; 0 at nodes without demand."
+                    f"margin of {margin} (setting industry.capacity_limit_margin); "
+                    "0 at nodes without demand."
                 ),
                 metadata=self.metadata,
             ),
@@ -360,8 +368,8 @@ class IndustryHeatSupply(DatasetCollection):
             df=limit.to_frame(),
             source=SourceInformation(
                 description=(
-                    f"The flat demand times the capacity limit margin of {margin}, "
-                    "see docs, 'Diffusion'."
+                    f"The flat demand times the capacity limit margin of {margin} "
+                    "(setting industry.capacity_limit_margin), see docs, 'Diffusion'."
                 ),
                 metadata=self.metadata,
             ),
@@ -426,11 +434,10 @@ class IndustryHeatSupply(DatasetCollection):
 
     def _calculate_boiler_fuel_shares(self, nodes: tuple[str, ...]) -> pd.DataFrame:
         """Fuel shares of the industrial heat production per node."""
-        eurostat = cast(EurostatEnergyBalanceIndustry,
-                        self.data["eurostat_energy_balance_industry"])
+        eurostat = cast(Eurostat, self.data["eurostat"])
         bfe = cast(BFEIndustry, self.data["bfe_industry"])
         year = self.settings.industry.data_year
-        heat = eurostat.get_heat_production(year).rename(
+        heat = eurostat.get_heat_production_industry(year).rename(
             columns={"electricity": "electrode"})
         heat = heat.reindex(
             index=list(nodes), columns=list(BOILER_FUELS), fill_value=0.0)
@@ -448,7 +455,7 @@ class IndustryHeatSupply(DatasetCollection):
         self, pooled: pd.DataFrame, nodes: tuple[str, ...]
     ) -> pd.DataFrame:
         """Combustion fuel mix per sector and node (JRC-IDEES, else EU27)."""
-        idees = cast(JRCIDEESIndustry, self.data["jrc_idees_industry"])
+        idees = cast(JRCIDEES, self.data["jrc_idees"])
         countries = [IDEES_EU if node in NODES_WITHOUT_IDEES else node for node in nodes]
         # waste share of the node's pooled biomass and waste capacity
         biomass_and_waste = pooled["biomass"] + pooled["waste"]
@@ -456,7 +463,7 @@ class IndustryHeatSupply(DatasetCollection):
                        ).fillna(0.0)
         shares = {}
         for sector in SECTORS:
-            thermal = idees.get_thermal_final_energy(
+            thermal = idees.get_industry_thermal_final_energy(
                 sector, self.settings.industry.data_year).loc[countries]
             thermal.index = pd.Index(list(nodes), name="node")
             fuels = thermal.T.groupby(thermal.columns.map(IDEES_BOILER_FUELS)).sum().T

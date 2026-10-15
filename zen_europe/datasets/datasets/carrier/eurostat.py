@@ -107,6 +107,20 @@ _HEAT_DH_NRG_BAL = {
     "GHP": "Gross heat production",
 }
 
+# fuels of the gross heat production that set the industrial boiler fuel mix,
+# mapped to the boiler fuels
+_HEAT_INDUSTRY_SIEC = {
+    "G3000": "natural_gas", # Natural gas
+    "R5110-5150_W6000RI": "biomass", # Primary solid biofuels
+    "R5300": "biomass", # Biogases
+    "E7000": "electricity", # Electricity
+    "O4000XBIO": "oil", # Oil and petroleum products (excluding biofuel portion)
+    "C0000X0350-0370": "coal", # Solid fossil fuels
+    "W6100": "waste", # Industrial waste (non-renewable)
+    "W6210": "waste", # Renewable municipal waste
+    "W6220": "waste", # Non-renewable municipal waste
+}
+
 _COAL_SIEC = {"C0220": "lignite", "C0129": "hard_coal"}
 _COAL_NRG_BAL = {
     # "TI_EHG_E": "Transformation Input",
@@ -315,6 +329,12 @@ class Eurostat(Dataset[dict[str, pd.DataFrame]]):
         return self._query_heat_dh_technology()
     
     @cache
+    def get_heat_production_industry(self, year: int) -> pd.DataFrame:
+        """Gross heat production (GWh) per node and boiler fuel, at the latest
+        available year up to `year`."""
+        return self._query_heat_production_industry(year)
+
+    @cache
     def get_coal_availability(self) -> pd.Series:
         """Coal availability per node."""
         return self._query_coal_availability()
@@ -453,6 +473,24 @@ class Eurostat(Dataset[dict[str, pd.DataFrame]]):
         heat_data = heat_data.swaplevel(0, 1).sort_index()
         return heat_data / Constants.GJ_PER_MWH  # convert from TJ to GWh
     
+    def _query_heat_production_industry(self, year: int) -> pd.DataFrame:
+        """Load the gross heat production per fuel, which sets the fuel mix of
+        the industrial boilers. Biomass and biogas, and the three waste fuels
+        are summed."""
+        data = self._query_siec_data(
+            nrg_bal=_HEAT_DH_NRG_BAL,
+            siec=_HEAT_INDUSTRY_SIEC,
+            start_period=_EUROSTAT_START_YEAR,
+        )
+        data = self._convert_availability(data, {}, cutoff_year=year)
+        data = data.droplevel("nrg_bal").astype(float)
+        for node, siec in data.stack(future_stack=True)[lambda s: s.isna()].index:
+            logger.warning(f"No {siec} heat production for {node}; set to 0.")
+        data = data.T.groupby(_HEAT_INDUSTRY_SIEC).sum().T
+        data.index.name = "node"
+        data.columns.name = None
+        return data
+
     def _query_coal_availability(self) -> pd.Series:
         """Calculate coal availability, scaled from imports and production
         by the ratio of total consumption to total availability."""

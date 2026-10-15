@@ -13,6 +13,15 @@ Input data are computed in `IndustryProductionData` (`industry_production_data.p
   of the production technology.
 - **Per-sector heat chain**: boilers, heat pumps, cascade, kiln fuel and TES are defined
   per sector (`<name>_<sector>`), so heat cannot be exchanged between sectors.
+- **Not in the default dataset**: the three sectors are not part of the default
+  `structure.set_sectors`; they are switched on per variant in `data/models.yaml`. The
+  generated model-structure pages and the statement in the model structure overview that
+  the default dataset includes all sectors therefore cover only the default sectors.
+- **Sector links**: `industry_heat` requires `electricity`, `gas`, `hydrogen` and
+  `district_heating`. `glass_post_comb` and `ceramic_post_comb` are also declared by
+  `carbon` and `cement` and only added when both are active. Each `*_DSM` is declared by
+  `industry_dsm` and by the sector of its product (`industry_heat`, `ammonia`, `cement`,
+  `methanol` or `steel`).
 
 ### Settings (`industry.*`, `zen_europe/settings/industry.py`)
 

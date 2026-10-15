@@ -38,6 +38,7 @@ class BFEIndustry(Dataset[pd.DataFrame]):
             author=["Bundesamt für Energie BFE"],
             publication="Bundesamt für Energie BFE",
             publication_year=2025,
+            url="https://pubdb.bfe.admin.ch/de/publication/download/12230",
             note="Branches 1 (food), 3 (paper) and 6 (other non-metallic minerals).",
         )
 

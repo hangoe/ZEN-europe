@@ -104,6 +104,12 @@ from zen_europe.elements.retrofitting_technologies.industry_post_comb import (
     CeramicPostComb,
     GlassPostComb,
 )
+from zen_europe.elements.storage_technologies.industry_DSM import (
+    CeramicDSM,
+    FoodDSM,
+    GlassDSM,
+    PaperDSM,
+)
 
 
 class IndustryHeatSector(Sector):
@@ -119,8 +125,6 @@ class IndustryHeatSector(Sector):
         "gas",
         "hydrogen",
         "district_heating",
-        "carbon",
-        "cement",
     ]
 
     def __init__(self) -> None:
@@ -212,4 +216,8 @@ class IndustryHeatSector(Sector):
             WasteBoilerIndustryFood,
             HeatIndustryTempConversion150Food,
             HeatIndustryTempConversion100Food,
+            GlassDSM,
+            CeramicDSM,
+            PaperDSM,
+            FoodDSM,
         ]

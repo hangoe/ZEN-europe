@@ -77,3 +77,21 @@ def test_write(tmp_path: Path) -> None:
         / "natural_gas_boiler_industry_glass"
     )
     assert (boiler / "capacity_existing.csv").exists()
+
+
+def test_industry_heat_without_carbon_and_cement(tmp_path: Path) -> None:
+    """The post-combustion capture is declared by industry_heat, carbon and cement,
+    and the DSM by industry_dsm and the product's sector, so neither is added."""
+    models = tmp_path / "models.yaml"
+    models.write_text(
+        "models:\n"
+        "  no_carbon:\n"
+        "    settings:\n"
+        "      structure:\n"
+        "        set_sectors: [electricity, gas, heat, district_heating, hydrogen,"
+        " industry_heat]\n"
+    )
+    model = create_model(models=models, model_name="no_carbon", write=False)
+    names = set(model.elements)
+    assert {"glass_production", "natural_gas_to_kilnfuel_glass"} <= names
+    assert not any(n.endswith("_post_comb") or n.endswith("_DSM") for n in names)
