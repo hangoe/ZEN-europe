@@ -6,6 +6,9 @@ from zen_creator import StorageTechnology
 from zen_creator.datasets.datasets.metadata import AssumptionInformation
 from zen_creator.utils.attribute import Attribute
 
+from zen_europe.datasets.dataset_collections.industry_heat_supply import (
+    IndustryHeatSupply,
+)
 from zen_europe.datasets.datasets.technology.brown2018 import Brown2018
 from zen_europe.datasets.datasets.technology.mayer2024 import Mayer2024
 
@@ -81,6 +84,13 @@ class IndustryTES:
             unit="Euro/GWh",
             source=AssumptionInformation(description="Against cycling."),
         )
+
+    def _set_capacity_limit(self) -> Attribute:
+        """Heat demand of the band and all lower bands times the capacity limit
+        margin."""
+        return IndustryHeatSupply(
+            self.settings, self.source_path
+        ).get_capacity_limit_tes(self)
 
     def _set_energy_to_power_ratio_min(self) -> Attribute:
         """Minimum duration of the storage type."""

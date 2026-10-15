@@ -241,6 +241,31 @@ class IndustryHeatSupply(DatasetCollection):
         capacity = self._calculate_heat_demand(element.sector, element.served_levels)
         return self._set_capacity_limit(element, capacity)
 
+    # ---------- thermal energy storage ----------
+
+    def get_capacity_limit_tes(self, element: Element) -> Attribute:
+        """Get the heat demand of the storage's band and all lower bands times the
+        capacity limit margin, 0 at nodes without demand."""
+        levels = HEAT_LEVELS[: HEAT_LEVELS.index(element.temp_level) + 1]
+        demand = self._calculate_heat_demand(element.sector, levels)
+        margin = self.settings.industry.capacity_limit_margin
+        nodes = pd.Index(self.settings.region.set_nodes, name="node")
+        # heat demand is in GW, the storage power unit is MW
+        limit = (demand * margin * 1000).reindex(nodes).fillna(0.0)
+        return element.capacity_limit.set_data(
+            default_value=np.inf,
+            unit=element.power_unit,
+            df=limit.rename("capacity_limit").to_frame(),
+            source=SourceInformation(
+                description=(
+                    "The flat heat demand of the storage's band and all lower bands "
+                    "(reachable via the temperature cascade) times the capacity limit "
+                    f"margin of {margin}; 0 at nodes without demand."
+                ),
+                metadata=self.metadata,
+            ),
+        )
+
     # ---------- kiln fuel ----------
 
     def get_capacity_existing_kiln_fuel(self, element: Element) -> Attribute:
