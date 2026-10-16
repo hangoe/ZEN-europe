@@ -23,4 +23,6 @@ class IndustrySettings(SettingsCategory):
     hp_share_first_year: float = 0.02
     # existing boiler capacities below this value (GW per node) are set to zero
     min_boiler_capacity: float = 0.005
+    # DSM category column; "pessimistic" is used by the DSM pessimistic scenario
+    # (DSM only, no TES)
     dsm_shiftability: Literal["optimistic", "pessimistic"] = "optimistic"

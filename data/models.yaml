@@ -53,7 +53,9 @@ models:
       structure:
         remove_sectors: [industry_tes]
 
+  # DSM only, with the pessimistic DSM shiftability categories
   zen_europe_ind_heat_v1_DSM_pessimistic:
+    extends: zen_europe_ind_heat_v1_DSM_only
     settings:
       industry:
         dsm_shiftability: pessimistic

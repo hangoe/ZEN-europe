@@ -44,7 +44,7 @@ Input data are computed in `IndustryProductionData` (`industry_production_data.p
 | full flexibility | `zen_europe_ind_heat_v1_full_flexibility` |
 | no flexibility / TES only / DSM only | remove `industry_tes` and/or `industry_dsm` |
 | no diffusion | `investment.use_diffusion_rates: false` |
-| DSM pessimistic | `industry.dsm_shiftability: pessimistic` |
+| DSM pessimistic | DSM only (removes `industry_tes`) with `industry.dsm_shiftability: pessimistic` |
 | single temperature (`_single_temp`) | removes the 0–100 and 100–150 °C heat pumps. Lower bands are served via the cascade |
 
 ## Product demand and existing capacity
