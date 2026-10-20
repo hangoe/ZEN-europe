@@ -3,23 +3,20 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, ClassVar
 
 from zen_creator import StorageTechnology
-from zen_creator.datasets.datasets.metadata import AssumptionInformation
 from zen_creator.utils.attribute import Attribute
 
 from zen_europe.datasets.dataset_collections.industry_heat_supply import (
     IndustryHeatSupply,
 )
 from zen_europe.datasets.datasets.technology.brown2018 import Brown2018
+from zen_europe.datasets.datasets.technology.industry_general_assumptions import (
+    IndustryGeneralAssumptions,
+)
 from zen_europe.datasets.datasets.technology.mayer2024 import Mayer2024
 from zen_europe.utils.industry import heat_carrier
 
 if TYPE_CHECKING:
     from zen_creator.model import Model
-
-# (dis)charging losses neglected, own assumption
-TES_EFFICIENCY = 1.0
-# variable O&M (Euro/GWh) against spurious cycling, own assumption
-TES_OPEX_VARIABLE = 1.0
 
 
 class IndustryTES:
@@ -28,9 +25,6 @@ class IndustryTES:
     sector: ClassVar[str]
     temp_level: ClassVar[str]
     storage_type: ClassVar[str]
-    # energy-to-power ratio (h): water tanks are intraday buffers of at least 1 h,
-    # steam accumulators are short-duration pressure vessels
-    duration: ClassVar[tuple[float, float]]
     # Brown et al. (2018) technology for the self-discharge
     self_discharge_proxy: ClassVar[str] = "hot water tank decentral"
 
@@ -63,18 +57,14 @@ class IndustryTES:
 
     def _set_efficiency_charge(self) -> Attribute:
         """Losses neglected."""
-        return self.efficiency_charge.set_data(
-            default_value=TES_EFFICIENCY,
-            unit="1",
-            source=AssumptionInformation(description="Losses neglected."),
+        return self._assumptions().get_attribute(
+            self, "efficiency_charge", "tes_efficiency"
         )
 
     def _set_efficiency_discharge(self) -> Attribute:
         """Losses neglected."""
-        return self.efficiency_discharge.set_data(
-            default_value=TES_EFFICIENCY,
-            unit="1",
-            source=AssumptionInformation(description="Losses neglected."),
+        return self._assumptions().get_attribute(
+            self, "efficiency_discharge", "tes_efficiency"
         )
 
     def _set_self_discharge(self) -> Attribute:
@@ -85,10 +75,8 @@ class IndustryTES:
 
     def _set_opex_specific_variable(self) -> Attribute:
         """Small cost against cycling."""
-        return self.opex_specific_variable.set_data(
-            default_value=TES_OPEX_VARIABLE,
-            unit="Euro/GWh",
-            source=AssumptionInformation(description="Against cycling."),
+        return self._assumptions().get_attribute(
+            self, "opex_specific_variable", "tes_opex_variable"
         )
 
     def _set_capacity_limit(self) -> Attribute:
@@ -100,41 +88,46 @@ class IndustryTES:
 
     def _set_energy_to_power_ratio_min(self) -> Attribute:
         """Minimum duration of the storage type."""
-        return self.energy_to_power_ratio_min.set_data(
-            default_value=self.duration[0],
-            unit="h",
-            source=AssumptionInformation(
-                description=f"Minimum duration of a {self.storage_type}."
-            ),
+        return self._assumptions().get_attribute(
+            self,
+            "energy_to_power_ratio_min",
+            "tes_energy_to_power_ratio_min",
+            self._storage_key(),
         )
 
     def _set_energy_to_power_ratio_max(self) -> Attribute:
         """Maximum duration of the storage type."""
-        return self.energy_to_power_ratio_max.set_data(
-            default_value=self.duration[1],
-            unit="h",
-            source=AssumptionInformation(
-                description=f"Maximum duration of a {self.storage_type}."
-            ),
+        return self._assumptions().get_attribute(
+            self,
+            "energy_to_power_ratio_max",
+            "tes_energy_to_power_ratio_max",
+            self._storage_key(),
         )
 
+    def _storage_key(self) -> str:
+        """Key of the storage type in the general industry assumptions."""
+        return self.storage_type.replace(" ", "_")
 
+    def _assumptions(self) -> IndustryGeneralAssumptions:
+        return IndustryGeneralAssumptions(self.source_path)
+
+
+# energy-to-power ratio: water tanks are intraday buffers of at least 1 h, steam
+# accumulators are short-duration pressure vessels (see the general industry
+# assumptions)
 class IndustryTESWater0100(IndustryTES):
     temp_level: ClassVar[str] = "0_100"
     storage_type: ClassVar[str] = "water tank"
-    duration: ClassVar[tuple[float, float]] = (1.0, 24.0)
 
 
 class IndustryTESWater100150(IndustryTES):
     temp_level: ClassVar[str] = "100_150"
     storage_type: ClassVar[str] = "water tank"
-    duration: ClassVar[tuple[float, float]] = (1.0, 24.0)
 
 
 class IndustryTESSteam150200(IndustryTES):
     temp_level: ClassVar[str] = "150_200"
     storage_type: ClassVar[str] = "steam accumulator"
-    duration: ClassVar[tuple[float, float]] = (0.25, 4.0)
 
 
 class IndustryTESWater0100Glass(IndustryTESWater0100, StorageTechnology):

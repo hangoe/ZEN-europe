@@ -1,10 +1,17 @@
-"""Names shared by the industry heat sectors, see docs, "Industry heat sectors"."""
+"""Names and helpers shared by the industry heat sectors, see docs, "Industry heat
+sectors"."""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from zen_europe.utils.utils import (
+    calculate_capacity_addition_from_cumulative,
+    format_capacity_existing,
+)
+
 if TYPE_CHECKING:
+    import pandas as pd
     from zen_creator import Element
 
 SECTORS = ("glass", "ceramic", "paper", "food")
@@ -28,3 +35,11 @@ def kiln_fuel(sector: str) -> str:
 def model_nodes(element: Element) -> tuple[str, ...]:
     """Nodes of the element's model."""
     return tuple(element.model.config.system.set_nodes)
+
+
+def spread_capacity_existing(capacity: pd.Series, element: Element) -> pd.Series:
+    """Spread today's capacity per node over its construction years, as for all
+    other technologies."""
+    frame = capacity.to_frame(element.settings.time.reference_year - 1)
+    frame = calculate_capacity_addition_from_cumulative(frame, element)
+    return format_capacity_existing(frame)

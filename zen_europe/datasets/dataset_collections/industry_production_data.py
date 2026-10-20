@@ -25,6 +25,9 @@ from zen_europe.datasets.datasets.financial.ECB import ECBInflation
 from zen_europe.datasets.datasets.technology.cement_production_gardarsdottir import (
     CementProductionGardarsdottir,
 )
+from zen_europe.datasets.datasets.technology.industry_general_assumptions import (
+    IndustryGeneralAssumptions,
+)
 from zen_europe.datasets.datasets.technology.industry_production_costs import (
     IndustryProductionCosts,
 )
@@ -38,10 +41,7 @@ from zen_europe.utils.industry import (
     SECTORS,
     kiln_fuel,
     model_nodes,
-)
-from zen_europe.utils.utils import (
-    calculate_capacity_addition_from_cumulative,
-    format_capacity_existing,
+    spread_capacity_existing,
 )
 
 if TYPE_CHECKING:
@@ -75,25 +75,6 @@ FOOD_ITEMS = {
     "bread_bakery": "Wheat",
     "sugar": "Raw cane or beet sugar (centrifugal only)",
 }
-# process CO2 (t/t), see docs, "Production technologies"
-CARBON_INTENSITY = {"glass": 0.1, "ceramic": 0.064234, "paper": 0.0, "food": 0.0}
-CARBON_INTENSITY_ASSUMPTIONS = {
-    "glass": (
-        "Assumed from the direct (raw-material decomposition) emissions of the "
-        "electrified glass routes in AIDRES (2023), Tables 19, 21 and 23 (0.07-0.23 "
-        "t/t), doi:10.2833/696697."
-    ),
-    "ceramic": (
-        "Process emissions are 15 % of the total emissions (JRC, Best Available "
-        "Techniques Reference Document for the Ceramic Manufacturing Industry, Final "
-        "Draft, April 2026); the combustion emissions are 8.036 GJ/t x 0.0453 t/GJ "
-        "(fuel-mix weighted), so the process emissions are 0.364 x 15/85 t/t."
-    ),
-    "paper": "No process emissions, only combustion emissions.",
-    "food": "No process emissions, only combustion emissions.",
-}
-# share of the kiln natural gas that can switch fuel, see docs, "Kiln fuel switching"
-KILN_SWITCHABLE_SHARE = {"glass": 1.0, "ceramic": 46.26 / 47.49}
 
 
 class IndustryProductionData(DatasetCollection):
@@ -124,6 +105,9 @@ class IndustryProductionData(DatasetCollection):
             "ecb": ECBInflation(self.source_path),
             "worldbank_population": WorldBankPopulation(self.source_path),
             "industry_production_costs": IndustryProductionCosts(self.source_path),
+            "industry_general_assumptions": IndustryGeneralAssumptions(
+                self.source_path
+            ),
         }
 
     # ---------- carriers ----------
@@ -237,13 +221,10 @@ class IndustryProductionData(DatasetCollection):
     def get_capacity_existing(self, element: Element) -> Attribute:
         """Get the existing production capacity, built evenly over the lifetime."""
         capacity = self._calculate_capacity(model_nodes(element))[element.sector]
-        capacity = capacity.to_frame(element.settings.time.reference_year - 1)
-        capacity = calculate_capacity_addition_from_cumulative(capacity, element)
-        capacity = format_capacity_existing(capacity)
         return element.capacity_existing.set_data(
             default_value=0.0,
             unit="tproduct/h",
-            df=capacity,
+            df=spread_capacity_existing(capacity, element),
             source=SourceInformation(
                 description=(
                     "The existing production capacity equals the product demand "
@@ -295,15 +276,16 @@ class IndustryProductionData(DatasetCollection):
 
     def get_carbon_intensity_technology(self, element: Element) -> Attribute:
         """Get the process CO2 emissions."""
-        intensity = CARBON_INTENSITY[element.sector]
+        assumptions = self._assumptions
+        intensity = assumptions.get_value("carbon_intensity", element.sector)
         return element.carbon_intensity_technology.set_data(
-            default_value=float(intensity),
-            unit="ton/tproduct",
+            default_value=intensity,
+            unit=assumptions.get_unit("carbon_intensity", element.sector),
             source=AssumptionInformation(
                 description=(
                     f"The process CO2 emissions of {element.sector} production are "
                     f"{intensity} t per t of product. "
-                    + CARBON_INTENSITY_ASSUMPTIONS[element.sector]
+                    + assumptions.get_description("carbon_intensity", element.sector)
                     + " See docs, 'Production technologies'."
                 ),
             ),
@@ -358,7 +340,7 @@ class IndustryProductionData(DatasetCollection):
         """Get the captured process CO2 per tonne of product."""
         dea = cast(DEA, self.data["dea"])
         capture_rate = dea.get_capture_rate_CCS()
-        intensity = float(CARBON_INTENSITY[element.sector])
+        intensity = self._assumptions.get_value("carbon_intensity", element.sector)
         return element.retrofit_flow_coupling_factor.set_data(
             default_value=round(intensity * capture_rate, 12),
             unit="tCO2/tproduct",
@@ -428,12 +410,22 @@ class IndustryProductionData(DatasetCollection):
 
     # ---------- helpers ----------
 
+    @property
+    def _assumptions(self) -> IndustryGeneralAssumptions:
+        return cast(
+            IndustryGeneralAssumptions, self.data["industry_general_assumptions"]
+        )
+
     def _calculate_fuel_inputs(self, sector: str) -> pd.Series:
         """Fuel shares, with the switchable kiln natural gas as kiln fuel."""
         shares = self.calculate_fuel_shares(sector)
-        if sector not in KILN_SWITCHABLE_SHARE or "natural_gas" not in shares:
+        assumptions = self._assumptions
+        if (
+            not assumptions.has_value("kiln_switchable_share", sector)
+            or "natural_gas" not in shares
+        ):
             return shares
-        switchable = KILN_SWITCHABLE_SHARE[sector]
+        switchable = assumptions.get_value("kiln_switchable_share", sector)
         natural_gas = shares.pop("natural_gas")
         shares[kiln_fuel(sector)] = natural_gas * switchable
         if natural_gas * (1 - switchable) > 1e-12:

@@ -9,6 +9,9 @@ from zen_creator.utils.attribute import Attribute
 from zen_europe.datasets.dataset_collections.industry_heat_supply import (
     IndustryHeatSupply,
 )
+from zen_europe.datasets.datasets.technology.industry_general_assumptions import (
+    IndustryGeneralAssumptions,
+)
 from zen_europe.elements.conversion_technologies.industry_heat_technology import (
     IndustryHeatTechnology,
 )
@@ -54,8 +57,9 @@ class HeatPumpIndustry(IndustryHeatTechnology):
     # ---------- Required methods that are called during object build ----------
 
     def _set_conversion_factor(self) -> Attribute:
-        """Half the Carnot COP."""
-        return self._supply().get_conversion_factor_heat_pump(self)
+        """Fraction of the Carnot COP."""
+        assumptions = IndustryGeneralAssumptions(self.source_path)
+        return assumptions.get_conversion_factor_heat_pump(self)
 
     def _set_capex_specific_conversion(self) -> Attribute:
         """Investment cost from DEA, plus waste-heat recovery."""
@@ -76,8 +80,10 @@ class HeatPumpIndustry(IndustryHeatTechnology):
         return self._supply().get_capacity_limit_heat_pump(self)
 
     def _set_capacity_addition_unbounded(self) -> Attribute:
-        """Seed from the district heating heat pumps."""
-        return self._supply().get_capacity_addition_unbounded_heat_pump(self)
+        """Seed from the existing district heating heat pumps."""
+        heat_pump_dh = self.model.elements["heat_pump_DH"]
+        fleet = float(heat_pump_dh.capacity_existing.df.squeeze().sum())
+        return self._supply().get_capacity_addition_unbounded_heat_pump(self, fleet)
 
     def _heat(self) -> str:
         return heat_carrier(self.temp_level, self.sector)

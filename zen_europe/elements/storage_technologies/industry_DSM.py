@@ -3,20 +3,17 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, ClassVar
 
 from zen_creator import StorageTechnology
-from zen_creator.datasets.datasets.metadata import AssumptionInformation
 from zen_creator.utils.attribute import Attribute
 
 from zen_europe.datasets.datasets.technology.dsm_literature_review import (
     DSMLiteratureReview,
 )
+from zen_europe.datasets.datasets.technology.industry_general_assumptions import (
+    IndustryGeneralAssumptions,
+)
 
 if TYPE_CHECKING:
     from zen_creator.model import Model
-
-# no physical asset (yr), own assumption
-DSM_LIFETIME = 50.0
-# small loss against simultaneous charging and discharging, own assumption
-DSM_EFFICIENCY = 0.999
 
 
 class IndustryDSM:
@@ -39,26 +36,18 @@ class IndustryDSM:
 
     def _set_lifetime(self) -> Attribute:
         """No physical asset."""
-        return self.lifetime.set_data(
-            default_value=DSM_LIFETIME,
-            unit="1",
-            source=AssumptionInformation(description="No physical asset."),
-        )
+        return self._assumptions().get_attribute(self, "lifetime", "dsm_lifetime")
 
     def _set_efficiency_charge(self) -> Attribute:
         """Small loss against simultaneous charging and discharging."""
-        return self.efficiency_charge.set_data(
-            default_value=DSM_EFFICIENCY,
-            unit="1",
-            source=AssumptionInformation(description="Small loss against cycling."),
+        return self._assumptions().get_attribute(
+            self, "efficiency_charge", "dsm_efficiency"
         )
 
     def _set_efficiency_discharge(self) -> Attribute:
         """Small loss against simultaneous charging and discharging."""
-        return self.efficiency_discharge.set_data(
-            default_value=DSM_EFFICIENCY,
-            unit="1",
-            source=AssumptionInformation(description="Small loss against cycling."),
+        return self._assumptions().get_attribute(
+            self, "efficiency_discharge", "dsm_efficiency"
         )
 
     def _set_capex_specific_storage_energy(self) -> Attribute:
@@ -78,6 +67,9 @@ class IndustryDSM:
     def _set_capacity_limit(self) -> Attribute:
         """Stock limited to the product's demand, 0 at nodes without demand."""
         return DSMLiteratureReview(self.source_path).get_capacity_limit(self)
+
+    def _assumptions(self) -> IndustryGeneralAssumptions:
+        return IndustryGeneralAssumptions(self.source_path)
 
 
 class GlassDSM(IndustryDSM, StorageTechnology):

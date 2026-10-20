@@ -24,6 +24,9 @@ from zen_europe.datasets.dataset_collections.technology_cost_database import (
 from zen_europe.datasets.datasets.carrier.bfe_industry import BFEIndustry
 from zen_europe.datasets.datasets.carrier.eurostat import Eurostat
 from zen_europe.datasets.datasets.carrier.jrc_idees import JRCIDEES
+from zen_europe.datasets.datasets.technology.industry_general_assumptions import (
+    IndustryGeneralAssumptions,
+)
 from zen_europe.utils.industry import (
     BOILER_FUELS,
     HEAT_LEVELS,
@@ -31,10 +34,7 @@ from zen_europe.utils.industry import (
     SECTORS,
     kiln_fuel,
     model_nodes,
-)
-from zen_europe.utils.utils import (
-    calculate_capacity_addition_from_cumulative,
-    format_capacity_existing,
+    spread_capacity_existing,
 )
 
 if TYPE_CHECKING:
@@ -49,13 +49,6 @@ COMBUSTION_FUELS = [fuel for fuel in BOILER_FUELS if fuel != "electrode"]
 FIT_SEED_FLOOR = 1e-3
 FIT_MAX_ITERATIONS = 1000
 FIT_TOLERANCE = 1e-10
-# heat pump COP: Carnot efficiency, supply (band centre) and source temperature (K)
-CARNOT_EFFICIENCY = 0.5
-SUPPLY_TEMPERATURE = {"0_100": 348.15, "100_150": 398.15, "150_200": 448.15}
-SOURCE_TEMPERATURE = {"waste_heat": 323.15, "water": 288.15}
-# waste-heat recovery (heat exchangers, piping) on top of the heat pump, Euro/kW:
-# between 1,234 and 1,645 Euro/kW in Stark et al. (2025), Joule 9, 102157, Table 2
-WASTE_HEAT_RECOVERY_CAPEX = 1500.0
 
 
 class IndustryHeatSupply(DatasetCollection):
@@ -80,6 +73,9 @@ class IndustryHeatSupply(DatasetCollection):
             "jrc_idees": JRCIDEES(self.source_path),
             "technology_cost_database": TechnologyCostDatabase(
                 self.settings, self.source_path
+            ),
+            "industry_general_assumptions": IndustryGeneralAssumptions(
+                self.source_path
             ),
         }
 
@@ -107,7 +103,7 @@ class IndustryHeatSupply(DatasetCollection):
         return element.capacity_existing.set_data(
             default_value=0.0,
             unit="GW",
-            df=self._format_capacity_existing(capacity, element),
+            df=spread_capacity_existing(capacity, element),
             source=SourceInformation(
                 description=(
                     "The existing boiler capacity equals the sector's heat demand "
@@ -125,34 +121,6 @@ class IndustryHeatSupply(DatasetCollection):
 
     # ---------- heat pumps ----------
 
-    def get_conversion_factor_heat_pump(self, element: Element) -> Attribute:
-        """Get the electricity per heat, from a fraction of the Carnot COP."""
-        supply = SUPPLY_TEMPERATURE[element.temp_level]
-        source = SOURCE_TEMPERATURE[element.heat_source]
-        cop = round(CARNOT_EFFICIENCY * supply / (supply - source), 4)
-        return element.conversion_factor.set_data(
-            default_value=[
-                {
-                    "electricity": {
-                        "default_value": round(1.0 / cop, 12),
-                        "unit": "GW/GW",
-                    }
-                }
-            ],
-            source=AssumptionInformation(
-                description=(
-                    f"The COP of {cop} is {CARNOT_EFFICIENCY:.0%} of the Carnot COP "
-                    f"between the source ({source - 273.15:.0f} °C) and the centre "
-                    f"of the temperature band ({supply - 273.15:.0f} °C). Carnot "
-                    "fraction and source temperatures are assumptions based on Bever "
-                    "et al. (2024), High-Temperature Heat Pumps for Industrial Use, "
-                    "Chemie Ingenieur Technik, doi:10.1002/cite.202300241, and Agora "
-                    "Energiewende and Fraunhofer IEG (2023), Roll-out von "
-                    "Großwärmepumpen in Deutschland."
-                ),
-            ),
-        )
-
     def get_capex_specific_conversion_heat_pump(self, element: Element) -> Attribute:
         """Get the DEA investment cost, plus waste-heat recovery for waste-heat heat
         pumps."""
@@ -162,18 +130,20 @@ class IndustryHeatSupply(DatasetCollection):
         )
         if element.heat_source != "waste_heat":
             return capex
+        assumptions = cast(
+            IndustryGeneralAssumptions, self.data["industry_general_assumptions"]
+        )
+        recovery = assumptions.get_value("waste_heat_recovery_capex")
         return capex.set_data(
-            default_value=capex.default_value + WASTE_HEAT_RECOVERY_CAPEX,
-            df=None if capex.df is None else capex.df + WASTE_HEAT_RECOVERY_CAPEX,
+            default_value=capex.default_value + recovery,
+            df=None if capex.df is None else capex.df + recovery,
             source=AssumptionInformation(
                 description=(
                     f"The DEA investment cost of '{element.cost_proxy}' (Danish Energy "
                     "Agency, Technology Data for Industrial Process Heat, "
                     "https://www.ens.dk/technologydata) plus an assumed "
-                    f"{WASTE_HEAT_RECOVERY_CAPEX} Euro/kW for the waste-heat recovery, "
-                    "within the range of 1,234-1,645 Euro/kW in Stark et al. (2025), "
-                    "Waste heat is mostly a waste of time, Joule 9, 102157, Table 2, "
-                    "doi:10.1016/j.joule.2025.102157."
+                    f"{recovery} Euro/kW for the waste-heat recovery, "
+                    + assumptions.get_description("waste_heat_recovery_capex")
                 ),
             ),
         )
@@ -225,12 +195,11 @@ class IndustryHeatSupply(DatasetCollection):
             ),
         )
 
-    def get_capacity_addition_unbounded_heat_pump(self, element: Element) -> Attribute:
-        """Get the seed: annual DH heat pump build-out, split by sector-band demand
-        share, heat source and node."""
-        fleet = float(
-            element.model.elements["heat_pump_DH"].capacity_existing.df.squeeze().sum()
-        )
+    def get_capacity_addition_unbounded_heat_pump(
+        self, element: Element, fleet: float
+    ) -> Attribute:
+        """Get the seed: annual build-out of the DH heat pump `fleet` (GW), split by
+        sector-band demand share, heat source and node."""
         nodes = model_nodes(element)
         demand = self._calculate_band_demand(nodes).sum(axis=1)
         share = demand[element.sector, element.temp_level] / demand.sum()
@@ -263,7 +232,7 @@ class IndustryHeatSupply(DatasetCollection):
         return element.capacity_existing.set_data(
             default_value=0.0,
             unit="GW",
-            df=self._format_capacity_existing(capacity, element),
+            df=spread_capacity_existing(capacity, element),
             source=SourceInformation(
                 description=(
                     "The existing capacity equals the heat demand of the lower "
@@ -327,7 +296,7 @@ class IndustryHeatSupply(DatasetCollection):
         return element.capacity_existing.set_data(
             default_value=0.0,
             unit="GW",
-            df=self._format_capacity_existing(capacity, element),
+            df=spread_capacity_existing(capacity, element),
             source=SourceInformation(
                 description=(
                     "The existing capacity equals the kiln natural gas demand of "
@@ -356,14 +325,6 @@ class IndustryHeatSupply(DatasetCollection):
         return self._set_capacity_limit(element, demand)
 
     # ---------- helpers ----------
-
-    @staticmethod
-    def _format_capacity_existing(capacity: pd.Series, element: Element) -> pd.Series:
-        """Spread today's capacity over its construction years, as for all other
-        technologies."""
-        capacity = capacity.to_frame(element.settings.time.reference_year - 1)
-        capacity = calculate_capacity_addition_from_cumulative(capacity, element)
-        return format_capacity_existing(capacity)
 
     def _set_capacity_limit(self, element: Element, demand: pd.Series) -> Attribute:
         """Limit the zero-cost pass-through technologies, see docs, 'Diffusion'."""

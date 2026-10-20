@@ -9,13 +9,13 @@ from zen_creator.utils.attribute import Attribute
 from zen_europe.datasets.dataset_collections.industry_heat_supply import (
     IndustryHeatSupply,
 )
+from zen_europe.datasets.datasets.technology.industry_general_assumptions import (
+    IndustryGeneralAssumptions,
+)
 from zen_europe.utils.industry import heat_carrier
 
 if TYPE_CHECKING:
     from zen_creator.model import Model
-
-# lifetime of the heat exchanger (yr), own assumption
-HEAT_EXCHANGER_LIFETIME = 30
 
 
 class HeatIndustryTempConversion:
@@ -66,11 +66,9 @@ class HeatIndustryTempConversion:
         )
 
     def _set_lifetime(self) -> Attribute:
-        """Lifetime of a heat exchanger."""
-        return self.lifetime.set_data(
-            default_value=HEAT_EXCHANGER_LIFETIME,
-            unit="1",
-            source=AssumptionInformation(description="Lifetime of a heat exchanger."),
+        """Lifetime of the temperature cascade."""
+        return IndustryGeneralAssumptions(self.source_path).get_attribute(
+            self, "lifetime", "temp_cascade_lifetime"
         )
 
     def _set_opex_specific_variable(self) -> Attribute:

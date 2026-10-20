@@ -36,6 +36,14 @@ Input data are computed in `IndustryProductionData` (`industry_production_data.p
 | `min_boiler_capacity` | 0.005 GW | existing boiler capacity per node below this is set to 0 |
 | `dsm_shiftability` | `optimistic` | DSM category column |
 
+### General assumptions
+
+Own numeric assumptions of the industry sectors (heat pump COP, waste-heat recovery cost,
+process CO2, kiln switchable share, and the technical parameters of the temperature
+cascade, TES and DSM) are in
+`data/raw_data/03-technology/industry/general_assumptions_industries.csv`
+(`IndustryGeneralAssumptions`), each with its reasoning and sources.
+
 ### Scenarios (`data/models.yaml`, generated with `zen-europe --all`)
 
 | scenario | change |
@@ -92,7 +100,7 @@ rest renormalized.
 **Costs**: JRC-EU-TIMES values (EUR2006), the ceramic proxy (EUR2014) and the food costs
 are inflated to `time.reference_year` with the ECB HICP (`ECBInflation`), as all other
 costs, and converted from EUR/(t/yr) to EUR/(t/h) (× 8760, rated capacity; as for all other
-technologies). Variable O&M excludes energy. **Process CO2** (`CARBON_INTENSITY`) covers
+technologies). Variable O&M excludes energy. **Process CO2** (`carbon_intensity` in the general assumptions) covers
 non-combustion emissions only.
 
 | sector | cost source | capex | fixed O&M | var. O&M | lifetime | process CO2 (t/t) |
@@ -133,8 +141,8 @@ The literature costs of paper and food are in
 
 ### Food
 
-- Rehfeldt sub-processes dairy, meat, brewing, bakery, sugar (bakery and sugar carry the
-  > 200 °C demand).
+- Rehfeldt sub-processes dairy, meat, brewing, bakery, sugar (bakery and sugar carry
+  the > 200 °C demand).
 - No consistent food cost data exist. Costs are rounded from three mid-sized JRC processes
   (hollow glass, quicklime, copper finishing), as food plants are mostly low-temperature
   processing lines.
@@ -146,7 +154,7 @@ supplied by `natural_gas_to_kilnfuel`, `hydrogen_to_kilnfuel` and
 `electricity_to_kilnfuel`. These model fuel choice only and have no costs; lifetime of the
 `cement_kiln` (as `*_to_cement_fuel`). Coal, biomass and oil shares remain fixed inputs.
 
-- **Switchable share** (`KILN_SWITCHABLE_SHARE`): glass 100 %, ceramic 97.4 %; the
+- **Switchable share** (`kiln_switchable_share` in the general assumptions): glass 100 %, ceramic 97.4 %; the
   remainder is a fixed `natural_gas` input.
 - **Existing capacity**: `natural_gas_to_kilnfuel` at today's kiln gas flow, with
   capacity limit (see [Diffusion](#diffusion)). Alternatives start at 0 with the
@@ -230,7 +238,7 @@ Per sector: three bands × two sources (waste heat, water). No existing capacity
 | capex (DEA) | 2.a, 1,200 EUR/kW | 2.b, 1,550 EUR/kW | 2.b, 1,550 EUR/kW |
 
 - COP = 0.5 × Carnot; source temperatures from Bever (2024) and Agora (2023). Lifetime 20 yr.
-- Waste-heat variants add 1,500 EUR/kW for heat recovery (`WASTE_HEAT_RECOVERY_CAPEX`),
+- Waste-heat variants add 1,500 EUR/kW for heat recovery (`waste_heat_recovery_capex`),
   based on Stark et al. (2025), Table 2 (~1,234–1,645 EUR/kW).
 - Water-source heat pumps are unlimited; waste-heat heat pumps are limited by the
   [waste heat limit](#waste-heat-limit).
@@ -239,7 +247,7 @@ Per sector: three bands × two sources (waste heat, water). No existing capacity
 
 `heat_industry_temp_conversion_{150,100}_<sector>` pass heat to the next lower band
 without losses or costs. Existing capacity = lower-band demand; capacity limit = demand ×
-`capacity_limit_margin`. Lifetime 30 yr.
+`capacity_limit_margin`. Lifetime 30 yr (`temp_cascade_lifetime`).
 
 ### Existing boiler fleet
 
