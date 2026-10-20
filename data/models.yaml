@@ -1,0 +1,89 @@
+# Model variants: settings patches on top of zen_europe_config.yaml.
+defaults:
+  settings:
+    structure:
+      set_sectors:
+        - electricity
+        - carbon
+        - gas
+        - heat
+        - district_heating
+        - hydrogen
+        - ammonia
+        - cement
+        - methanol
+        - refining
+        - aviation
+        - shipping
+        - steel
+        - passenger_transport
+        - truck_transport
+        - industry_heat
+        - industry_tes
+        - industry_dsm
+
+models:
+  # ZEN-europe base: no industrial heat (paper, ceramic, glass, food) and no TES/DSM
+  zen_europe_base:
+    settings:
+      structure:
+        remove_sectors: [industry_heat, industry_tes, industry_dsm]
+
+  # full flexibility: thermal energy storage and demand-side management
+  zen_europe_ind_heat_v1_full_flexibility: {}
+
+  zen_europe_ind_heat_v1_no_flexibility:
+    settings:
+      structure:
+        remove_sectors: [industry_tes, industry_dsm]
+
+  zen_europe_ind_heat_v1_no_flexibility_nodiffusion:
+    extends: zen_europe_ind_heat_v1_no_flexibility
+    settings:
+      investment:
+        use_diffusion_rates: false
+
+  zen_europe_ind_heat_v1_TES_only:
+    settings:
+      structure:
+        remove_sectors: [industry_dsm]
+
+  zen_europe_ind_heat_v1_DSM_only:
+    settings:
+      structure:
+        remove_sectors: [industry_tes]
+
+  # DSM only, with the pessimistic DSM shiftability categories
+  zen_europe_ind_heat_v1_DSM_pessimistic:
+    extends: zen_europe_ind_heat_v1_DSM_only
+    settings:
+      industry:
+        dsm_shiftability: pessimistic
+
+  # only the highest temperature band has heat pumps
+  zen_europe_ind_heat_v1_full_flexibility_single_temp:
+    settings:
+      structure:
+        remove_technologies: &low_band_heat_pumps
+          - heat_pump_industry_0_100_waste_heat_glass
+          - heat_pump_industry_0_100_water_glass
+          - heat_pump_industry_100_150_waste_heat_glass
+          - heat_pump_industry_100_150_water_glass
+          - heat_pump_industry_0_100_waste_heat_ceramic
+          - heat_pump_industry_0_100_water_ceramic
+          - heat_pump_industry_100_150_waste_heat_ceramic
+          - heat_pump_industry_100_150_water_ceramic
+          - heat_pump_industry_0_100_waste_heat_paper
+          - heat_pump_industry_0_100_water_paper
+          - heat_pump_industry_100_150_waste_heat_paper
+          - heat_pump_industry_100_150_water_paper
+          - heat_pump_industry_0_100_waste_heat_food
+          - heat_pump_industry_0_100_water_food
+          - heat_pump_industry_100_150_waste_heat_food
+          - heat_pump_industry_100_150_water_food
+
+  zen_europe_ind_heat_v1_no_flexibility_single_temp:
+    extends: zen_europe_ind_heat_v1_no_flexibility
+    settings:
+      structure:
+        remove_technologies: *low_band_heat_pumps

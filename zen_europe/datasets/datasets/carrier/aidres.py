@@ -16,6 +16,11 @@ import pandas as pd
 
 from zen_europe.utils.constants import Constants
 
+# kiln fuel input per kiln fuel output of the glass routes, weighted by production
+# share, relative to the natural gas route; also used for ceramic (see docs)
+KILN_FUEL_INPUT = {"natural_gas": 1.0, "hydrogen": 1.0577, "electricity": 0.8438}
+
+
 class Aidres(Dataset[pd.DataFrame]):
     """
     Aidres dataset class.
@@ -57,11 +62,15 @@ class Aidres(Dataset[pd.DataFrame]):
                 sheet_name="Methanol (PJ per y)", header=12).set_index("NUTS ID")
         methanol_demand = methanol_demand["All sectors (PJ/y).1"]
 
+        # glass routes (container, flat, fibre), Tables 19, 21 and 23
+        glass = pd.read_csv(self.path / "AIDRES2023_glass.csv").set_index("sub_process")
+
         data = {
             "clinker": cement_demand.to_frame(name="demand"),
             "primary_steel": steel_demand.to_frame(name="demand"),
             "secondary_steel": steel_demand.to_frame(name="demand"),
-            "methanol": methanol_demand.to_frame(name="demand")
+            "methanol": methanol_demand.to_frame(name="demand"),
+            "glass": glass,
         }
         return data
 
@@ -236,3 +245,29 @@ class Aidres(Dataset[pd.DataFrame]):
             "coal_to_cement_fuel": 0.54, # 54% of existing capacity
         }
         return existing_capacity_share
+
+    def get_sub_processes_glass(self) -> pd.DataFrame:
+        """Natural gas and electricity intensity (GJ/t) per glass route."""
+        return self.data["glass"][["ng_GJ_t", "elec_GJ_t"]]
+
+    def get_production_shares_glass(self) -> pd.Series:
+        """EU production share per glass route."""
+        return self.data["glass"]["eu_production_share"]
+
+    def get_conversion_factor_kiln_fuel(
+            self, element: ConversionTechnology) -> Attribute:
+        """Fuel input per kiln fuel, relative to the natural gas route."""
+        return element.conversion_factor.set_data(
+            default_value=[
+                {
+                    element.fuel: {
+                        "default_value": KILN_FUEL_INPUT[element.fuel],
+                        "unit": "GW/GW",
+                    }
+                }
+            ],
+            source=SourceInformation(
+                description="Fuel route efficiency of the glass routes.",
+                metadata=self.metadata,
+            ),
+        )

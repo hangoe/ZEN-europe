@@ -231,7 +231,7 @@ class TechnologyCostDatabase(DatasetCollection):
 
     def get_efficiency(
         self, element: Element, plant_size: str | None = None, metric: str = "mean",
-        reference_year: int | None = None
+        reference_year: int | None = None, proxy_element_name: str | None = None
     ) -> tuple[pd.Series, list[str]]:
         """Conversion efficiency [-] for `technology`, indexed by year.
 
@@ -240,16 +240,17 @@ class TechnologyCostDatabase(DatasetCollection):
         computation together with carrier-specific heating values) and has no
         single common attribute to populate across all conversion technologies.
         """
+        technology = proxy_element_name or element.name
         data = self._aggregate(
-            element.name, "efficiency", 
-            plant_size, metric, 
+            technology, "efficiency",
+            plant_size, metric,
             reference_year or self.settings.time.reference_year
         )
         optimization_years = pd.Index(element.settings.time.years)
         data = self._reindex_to_years(data, optimization_years)
-        agencies = self._extract_agencies(element.name, "efficiency", plant_size)
+        agencies = self._extract_agencies(technology, "efficiency", plant_size)
         assert not data.empty, (
-            f"No efficiency data found for technology '{element.name}' "
+            f"No efficiency data found for technology '{technology}' "
             f"at plant size '{plant_size}' in any agency dataset."
         )
         return data, agencies

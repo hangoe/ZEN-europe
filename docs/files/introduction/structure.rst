@@ -68,6 +68,12 @@ freight mileage, steel, cement, ammonia, methanol, olefins, fuels for aviation
 and shipping). The model decides on the investment in and operation of all
 technologies that supply these demands.
 
+The optional sector ``industry_heat`` adds glass, ceramic, paper and food
+production together with their process heat supply, and the optional sectors
+``industry_tes`` and ``industry_dsm`` add thermal energy storage and
+demand-side management of industrial products (see
+:doc:`../user_guide/industry`).
+
 System-wide constraints and assumptions are set by the energy system class
 ``energy_system_nuts0``:
 
