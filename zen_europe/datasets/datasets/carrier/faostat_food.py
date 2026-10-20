@@ -42,7 +42,9 @@ class FAOSTATFood(Dataset[pd.DataFrame]):
         data = data[data["Element"] == "Production"]
         data["node"] = convert_country_names(data["Area"])
         assert data["node"].notna().all(), "Unknown FAOSTAT area."
-        year_columns = [c for c in data.columns if c.startswith("Y") and c[1:].isdigit()]
+        year_columns = [
+            c for c in data.columns if c.startswith("Y") and c[1:].isdigit()
+        ]
         data = data.set_index(["Item", "node"])[year_columns]
         data.columns = [int(c[1:]) for c in year_columns]
         return data  # t

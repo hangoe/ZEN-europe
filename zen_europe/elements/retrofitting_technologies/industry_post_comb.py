@@ -28,7 +28,7 @@ class IndustryPostComb:
 
     sector: ClassVar[str]
 
-    def __init__(self, model: Model, power_unit: str = "kilotCO2/hour"):
+    def __init__(self, model: Model, power_unit: str = "tCO2/h"):
         super().__init__(model=model, power_unit=power_unit)
 
     # ---------- Required methods that are called during object construction ----------
@@ -98,11 +98,11 @@ class IndustryPostComb:
         )
 
     def _set_capacity_addition_unbounded(self) -> Attribute:
-        """As cement_post_comb, from tCO2/h to kilotCO2/h."""
+        """As cement_post_comb."""
         cement = self.model.elements["cement_post_comb"].capacity_addition_unbounded
         return self.capacity_addition_unbounded.set_data(
-            default_value=cement.default_value / 1000,
-            unit="kilotCO2/hour",
+            default_value=cement.default_value,
+            unit=cement.unit,
             source=AssumptionInformation(description="As cement_post_comb."),
         )
 

@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar
 
-import numpy as np
-import pandas as pd
 from zen_creator import StorageTechnology
 from zen_creator.datasets.datasets.metadata import AssumptionInformation
 from zen_creator.utils.attribute import Attribute
@@ -79,21 +77,7 @@ class IndustryDSM:
 
     def _set_capacity_limit(self) -> Attribute:
         """Stock limited to the product's demand, 0 at nodes without demand."""
-        demand = self.model.elements[self.carrier].demand.df
-        demand = demand if demand.ndim == 1 else demand.iloc[:, 0]
-        nodes = list(self.model.config.system.set_nodes)
-        nodes += [node for node in demand.index if node not in nodes]
-        limit = (
-            demand.reindex(pd.Index(nodes, name=demand.index.name))
-            .fillna(0.0)
-            .rename("capacity_limit")
-        )
-        return self.capacity_limit.set_data(
-            default_value=np.inf,
-            unit=self.power_unit,
-            df=limit.to_frame(),
-            source=AssumptionInformation(description="Stock up to the product demand."),
-        )
+        return DSMLiteratureReview(self.source_path).get_capacity_limit(self)
 
 
 class GlassDSM(IndustryDSM, StorageTechnology):

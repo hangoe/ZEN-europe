@@ -115,6 +115,29 @@ _JRC_IDEES_THERMAL_CARRIERS = {
     "Biomass and waste",
     "Distributed steam",
 }
+# model carrier of the JRC-IDEES thermal carriers, per use; carriers that are not
+# mapped are summed as "other"
+_JRC_IDEES_FUEL_MAPPINGS = {
+    # fuel inputs of the production technologies
+    "production": {
+        "Natural gas and biogas": "natural_gas",
+        "Solids": "hard_coal",
+        "Biomass and waste": "biomass",
+        "Other liquids": "oil",
+    },
+    # boiler fuels; biomass and waste are one carrier in JRC-IDEES
+    "boiler": {
+        "Natural gas and biogas": "natural_gas",
+        "Solids": "coal",
+        "Derived gases": "coal",
+        "LPG": "oil",
+        "Diesel oil and liquid biofuels": "oil",
+        "Fuel oil": "oil",
+        "Other liquids": "oil",
+        "Refinery gas": "oil",
+        "Biomass and waste": "biomass_and_waste",
+    },
+}
 
 class JRCIDEES(Dataset[pd.DataFrame]):
     """
@@ -383,6 +406,29 @@ class JRCIDEES(Dataset[pd.DataFrame]):
             raise ValueError(f"No {year} value for all thermal carriers of {sector}.")
         # carriers not reported for a node are not consumed there
         return data.unstack("carrier", fill_value=0.0)
+
+    def get_industry_thermal_final_energy_by_fuel(
+        self, sector: str, year: int, use: str
+    ) -> pd.DataFrame:
+        """
+        Get the thermal final energy consumption of an industry sector per model
+        fuel.
+
+        Args:
+            sector (str): The industry sector (glass, ceramic, paper or food).
+            year (int): The year of the data.
+            use (str): The fuel mapping, "production" (fuel inputs of the
+                production technologies) or "boiler" (boiler fuels).
+
+        Returns:
+            pd.DataFrame: Consumption in ktoe, indexed by node, one column per
+                model fuel; carriers without a fuel of this use are summed as
+                "other".
+        """
+        mapping = _JRC_IDEES_FUEL_MAPPINGS[use]
+        thermal = self.get_industry_thermal_final_energy(sector, year)
+        fuels = thermal.columns.map(lambda carrier: mapping.get(carrier, "other"))
+        return thermal.T.groupby(fuels, sort=False).sum().T
 
     def get_industry_installed_capacity(self, sector: str, year: int) -> pd.Series:
         """Installed production capacity (kt) of an industry sector per node."""

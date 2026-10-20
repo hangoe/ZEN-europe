@@ -59,7 +59,7 @@ class BFEIndustry(Dataset[pd.DataFrame]):
     def _extract_sheet(sheet: pd.DataFrame) -> pd.DataFrame:
         """Extract the yearly consumption of the selected branches."""
         (header_row,) = sheet.index[sheet[0] == "BranchenNr."]
-        data = sheet.iloc[header_row + 1:].set_index(0).iloc[:, 2:]
+        data = sheet.iloc[header_row + 1 :].set_index(0).iloc[:, 2:]
         data.columns = sheet.iloc[header_row, 3:].astype(int).to_numpy()
         return data.loc[BRANCHES].astype(float)
 
@@ -77,4 +77,5 @@ class BFEIndustry(Dataset[pd.DataFrame]):
         latest_year = max(y for y in self.data.columns if y <= year)
         consumption = self.data[latest_year]
         return consumption.groupby(
-            consumption.index.get_level_values("sheet").map(SHEETS)).sum()
+            consumption.index.get_level_values("sheet").map(SHEETS)
+        ).sum()

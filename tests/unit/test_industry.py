@@ -20,7 +20,6 @@ from zen_europe.datasets.datasets.carrier.rehfeldt2017 import Rehfeldt2017
 from zen_europe.datasets.datasets.carrier.wolf2017 import Wolf2017
 from zen_europe.datasets.datasets.technology.brown2018 import Brown2018
 from zen_europe.datasets.datasets.technology.dsm_literature_review import (
-    CATEGORIES,
     DSMLiteratureReview,
 )
 from zen_europe.datasets.datasets.technology.jrc_eu_times_industry import (
@@ -101,11 +100,13 @@ def test_boiler_capacity_matches_demand_and_fuel_totals(
     heat_supply: IndustryHeatSupply, production: IndustryProductionData
 ) -> None:
     capacity = heat_supply._calculate_boiler_capacity(NODES)
-    demand = pd.DataFrame({
-        s: production.calculate_demand(s, NODES)
-        * production.calculate_energy_intensity(s)["heat"]
-        for s in SECTORS
-    })
+    demand = pd.DataFrame(
+        {
+            s: production.calculate_demand(s, NODES)
+            * production.calculate_energy_intensity(s)["heat"]
+            for s in SECTORS
+        }
+    )
     pooled = heat_supply._calculate_boiler_fuel_shares(NODES)
     for node in ("DE", "SE", "CH"):
         node_capacity = capacity.xs(node, level="node")
@@ -113,7 +114,9 @@ def test_boiler_capacity_matches_demand_and_fuel_totals(
             demand.loc[node, list(SECTORS)].to_numpy()
         )
         assert node_capacity.sum().to_numpy() == pytest.approx(
-            (demand.loc[node].sum() * pooled.loc[node])[node_capacity.columns].to_numpy()
+            (demand.loc[node].sum() * pooled.loc[node])[
+                node_capacity.columns
+            ].to_numpy()
         )
 
 
@@ -131,7 +134,8 @@ def test_capacity_existing_uses_shared_vintages(
         construction_time=SimpleNamespace(default_value=0),
     )
     capacity = production._calculate_capacity(NODES)["glass"].to_frame(
-        reference_year - 1)
+        reference_year - 1
+    )
     vintages = format_capacity_existing(
         calculate_capacity_addition_from_cumulative(capacity, element)  # type: ignore[arg-type]
     )
@@ -143,9 +147,9 @@ def test_capacity_existing_uses_shared_vintages(
 
 
 def test_dsm_shiftability() -> None:
-    review = DSMLiteratureReview(None)
-    for categories in CATEGORIES.values():
-        assert categories["pessimistic"] <= categories["optimistic"]
+    review = DSMLiteratureReview(RAW_DATA_PATH)
+    categories = review.get_categories()
+    assert (categories["pessimistic"] <= categories["optimistic"]).all()
 
     def cost(carrier: str, shiftability: str) -> float:
         settings = Settings.model_validate(
@@ -158,7 +162,8 @@ def test_dsm_shiftability() -> None:
     assert cost("ceramic", "pessimistic") == 1000.0
     # energy basis: per GWh instead of per tonne
     assert cost("ammonia", "optimistic") == pytest.approx(
-        20.0 / Constants.AMMONIA_GWH_PER_TON)
+        20.0 / Constants.AMMONIA_GWH_PER_TON
+    )
 
 
 def test_tes_self_discharge_brown2018() -> None:

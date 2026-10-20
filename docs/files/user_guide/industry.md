@@ -61,7 +61,8 @@ and the existing kiln fuel capacity on annual average production (JRC-IDEES outp
 
 **Nodes without JRC-IDEES** (CH, NO, UK; `NODES_WITHOUT_IDEES`):
 
-- glass, ceramic: CH = AT, NO = FI, UK = DE × 69.9/83.5 (population);
+- glass, ceramic: CH = AT, NO = FI, UK = DE × population UK/DE in `industry.data_year`
+  (World Bank, `WorldBankPopulation`);
 - paper: 2008 *consumption* from JRC BAT Paper (2015), Table 1.2 (CH 1,397, NO 831,
   UK 11,443 kt). No existing boilers or waste heat at these nodes;
 - food: FAOSTAT covers all nodes.
@@ -98,8 +99,12 @@ non-combustion emissions only.
 |---|---|---|---|---|---|---|
 | glass | JRC `IGHHOLLOW01`, `IGFFLATGL01` | 2.34 M EUR/(t/h) | 178 k EUR/(t/h)/yr | 64 EUR/t | 28 yr | 0.1 |
 | ceramic | Gardarsdóttir et al. (2019) clinker plant (`CementProductionGardarsdottir`) | 1.83 M EUR/(t/h) | 136 k EUR/(t/h)/yr | 7.5 EUR/t | 25 yr | 0.0642 |
-| paper | JRC `IPPHIGQUA01`, `IPPLOWQUA01`, `IPPPUPCHE01`; capex override `PAPER_CAPEX` | 700 EUR/(t/yr) | JRC | JRC | JRC | 0 |
-| food | `FOOD_COSTS` | 300 EUR/(t/yr) | 15 EUR/(t/yr)/yr | 0 | 20 yr | 0 |
+| paper | JRC `IPPHIGQUA01`, `IPPLOWQUA01`, `IPPPUPCHE01`; capex override from literature | 700 EUR/(t/yr) | JRC | JRC | JRC | 0 |
+| food | literature | 300 EUR/(t/yr) | 15 EUR/(t/yr)/yr | 0 | 20 yr | 0 |
+
+The literature costs of paper and food are in
+`data/raw_data/03-technology/industry/industry_production_costs.csv`
+(`IndustryProductionCosts`), together with their sources.
 
 ### Glass
 
@@ -331,8 +336,9 @@ neglected; variable O&M prevents spurious cycling.
 
 DSM is modeled as product storage (`industry_DSM.py`) for glass, ceramic, paper, food,
 ammonia, clinker, methanol, primary and secondary steel, and olefin. Each product has a
-shiftability category (`CATEGORIES`, `dsm_literature_review.py`) with parameters in
-`CATEGORY_PARAMETERS` (internal assumptions):
+shiftability category (`DSMLiteratureReview`, read from
+`data/raw_data/03-technology/industry/dsm_shiftability_categories.csv`) with parameters
+in `dsm_category_parameters.csv` (internal assumptions):
 
 | category | meaning | storage and variable cost (EUR/t) | max. horizon (h) |
 |---|---|---|---|
@@ -345,7 +351,7 @@ shiftability category (`CATEGORIES`, `dsm_literature_review.py`) with parameters
 | glass | 1 | 1 | continuous furnace campaigns of 5–15 yr | Hubert 2015; Hongtai 2024 |
 | ceramic | 1 | 2 | tunnel kilns continuous; batch kilns can stop between cycles | Tangram |
 | paper | 2 | 3 | mechanical pulping with pulp storage | Helin et al. 2017 |
-| food | 1 | 2 | industry interview | Ana 2026 (TODO) |
+| food | 1 | 2 | industry interview | Perez Recatala (ongoing) |
 | methanol | 2 | 3 | power-to-methanol can ramp | Schneider & Lagoni 2023; Chen & Yang 2021 |
 | primary steel | 1 | 1 | blast furnaces barely vary | Boldrini et al. 2024; Golmohamadi 2021 |
 | secondary steel | 2 | 3 | EAF load flexibility | Boldrini et al. 2024; Golmohamadi 2021 |
@@ -402,8 +408,8 @@ modeled sectors (2022 limit: ~+5.5 %).
 - Helin, K., Käki, A., Zakeri, B., Lahdelma, R., Syri, S. (2017). Economic potential of industrial demand side management in pulp and paper industry. *Energy* 141, 1681–1694. doi:10.1016/j.energy.2017.11.075.
 - Hongtai (2024). Henan Hongtai Kiln Refractory Co. *Why can't the glass melting furnace be stopped?* <https://www.refractory-firebricks.com/case/343.html> (vendor page).
 - Hubert, M. (2015). *Basics of industrial glass melting furnaces.* IMI-NFG course, Lecture 3. <https://www.lehigh.edu/imi/teched/GlassProcess/Lectures/Lecture03_Hubert_industglassmeltfurnaces.pdf>
+- Perez Recatala, A. (ongoing). Master thesis, EPSE, ETH Zurich.
 - Salmon, N., Bañares-Alcántara, R. (2023). Impact of process flexibility and imperfect forecasting on the operation and design of Haber–Bosch green ammonia. *RSC Sustainability* 1, 923–937. doi:10.1039/D3SU00067B.
 - Schneider, N. T., Lagoni, Z. (2023). *Flexibility of Power-to-Methanol in 2030.* Master's thesis, Aalborg University.
 - Tangram Technology. *Energy management in ceramics processing* (no date; accessed 2026-07-20). <https://tangram.co.uk/wp-content/uploads/Energy-and-Sustainability-Topics-Energy-management-in-ceramics-processing.pdf>
 - Tiggeloven, J. L., Faaij, A. P. C., Kramer, G. J., Gazzani, M. (2023). Optimization of electric ethylene production: Exploring the role of cracker flexibility, batteries, and renewable energy integration. *Ind. Eng. Chem. Res.* 62(40). doi:10.1021/acs.iecr.3c02226.
-- Ana Perez Recatala (2026). Personal interview (`input_data/DSM_parametrization/DMS_processes_Ana.xlsx`). **TODO.**

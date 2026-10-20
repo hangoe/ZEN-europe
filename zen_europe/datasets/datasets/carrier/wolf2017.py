@@ -54,7 +54,8 @@ class Wolf2017(Dataset[pd.DataFrame]):
                 industry heat sector.
         """
         heat = self.data.loc[
-            list(SECTOR_TO_BRANCH.values()), ["PW_bis_150C", "PW_bis_200C"]]
+            list(SECTOR_TO_BRANCH.values()), ["PW_bis_150C", "PW_bis_200C"]
+        ]
         # shares are given as strings, e.g. "13%"
         heat = heat.apply(lambda column: column.str.strip("%").astype(float) / 100)
         heat.index = list(SECTOR_TO_BRANCH)

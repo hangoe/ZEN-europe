@@ -57,12 +57,15 @@ class JRCEUTIMESIndustry(Dataset[pd.DataFrame]):
     def _set_data(self) -> pd.DataFrame:
         sheet = pd.read_excel(self.path, sheet_name="IND", header=None)
         sheet.columns = sheet.iloc[HEADER_ROW]
-        sheet = sheet.iloc[HEADER_ROW + 1:]
+        sheet = sheet.iloc[HEADER_ROW + 1 :]
         # a process spans several rows, only the first one holds its name
         technology = sheet["TechName"].replace("", None).ffill()
         parameters = sheet[list(PARAMETERS)].rename(columns=PARAMETERS)
         parameters = parameters.apply(
-            lambda column: pd.to_numeric(column.astype(str).str.strip(), errors="coerce"))
+            lambda column: pd.to_numeric(
+                column.astype(str).str.strip(), errors="coerce"
+            )
+        )
         # zeros are placeholders; a process takes its last non-zero value
         parameters = parameters.where(parameters != 0)
         parameters = parameters.groupby(technology.to_numpy()).last()

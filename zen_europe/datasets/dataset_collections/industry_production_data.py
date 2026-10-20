@@ -17,10 +17,16 @@ from zen_europe.datasets.datasets.carrier.jrc_bat_paper import JRCBATPaper
 from zen_europe.datasets.datasets.carrier.jrc_idees import JRCIDEES
 from zen_europe.datasets.datasets.carrier.rehfeldt2017 import Rehfeldt2017
 from zen_europe.datasets.datasets.carrier.wolf2017 import Wolf2017
+from zen_europe.datasets.datasets.energy_system.worldbank_population import (
+    WorldBankPopulation,
+)
 from zen_europe.datasets.datasets.financial.dea import DEA
 from zen_europe.datasets.datasets.financial.ECB import ECBInflation
 from zen_europe.datasets.datasets.technology.cement_production_gardarsdottir import (
     CementProductionGardarsdottir,
+)
+from zen_europe.datasets.datasets.technology.industry_production_costs import (
+    IndustryProductionCosts,
 )
 from zen_europe.datasets.datasets.technology.jrc_eu_times_industry import (
     BASE_YEAR,
@@ -44,16 +50,10 @@ if TYPE_CHECKING:
 
 NODES_WITHOUT_IDEES = ("CH", "NO", "UK")
 IDEES_EU = "EU27"
-# proxy node and scaling factor of the nodes without JRC-IDEES data: CH as AT,
-# NO as FI, UK as DE times the UK/DE population 2023 (69.9 M / 83.5 M)
-PROXY_NODES = {"CH": ("AT", 1.0), "NO": ("FI", 1.0), "UK": ("DE", 69.9 / 83.5)}
-# JRC-IDEES thermal carriers that are fuel inputs of the production technologies
-FUELS = {
-    "Natural gas and biogas": "natural_gas",
-    "Solids": "hard_coal",
-    "Biomass and waste": "biomass",
-    "Other liquids": "oil",
-}
+# proxy node of the nodes without JRC-IDEES data: CH as AT, NO as FI, UK as DE
+PROXY_NODES = {"CH": "AT", "NO": "FI", "UK": "DE"}
+# nodes scaled from their proxy node by population (World Bank)
+POPULATION_SCALED = ("UK",)
 # JRC-EU-TIMES processes of the glass routes and paper sub-processes
 JRC_PROCESSES = {
     "glass": {
@@ -94,10 +94,6 @@ CARBON_INTENSITY_ASSUMPTIONS = {
 }
 # share of the kiln natural gas that can switch fuel, see docs, "Kiln fuel switching"
 KILN_SWITCHABLE_SHARE = {"glass": 1.0, "ceramic": 46.26 / 47.49}
-# literature capex of paper (Euro/(t/a)), see docs, "Paper"
-PAPER_CAPEX = 700
-# capex and fixed opex of food production (Euro/(t/a), BASE_YEAR prices), lifetime (yr)
-FOOD_COSTS = {"capex": 300, "opex_fixed": 15, "lifetime": 20}
 
 
 class IndustryProductionData(DatasetCollection):
@@ -122,9 +118,12 @@ class IndustryProductionData(DatasetCollection):
             "jrc_bat_paper": JRCBATPaper(self.source_path),
             "jrc_eu_times_industry": JRCEUTIMESIndustry(self.source_path),
             "cement_production_gardarsdottir": CementProductionGardarsdottir(
-                self.source_path),
+                self.source_path
+            ),
             "dea": DEA(self.source_path),
             "ecb": ECBInflation(self.source_path),
+            "worldbank_population": WorldBankPopulation(self.source_path),
+            "industry_production_costs": IndustryProductionCosts(self.source_path),
         }
 
     # ---------- carriers ----------
@@ -148,7 +147,8 @@ class IndustryProductionData(DatasetCollection):
                     "derived from the JRC-IDEES thermal energy consumption and the "
                     "Rehfeldt et al. (2017) fuel intensity (ceramic), or from the "
                     "FAOSTAT production (food). Nodes without JRC-IDEES data use a "
-                    "proxy node (CH as AT, NO as FI, UK as DE scaled by population); "
+                    "proxy node (CH as AT, NO as FI, UK as DE scaled by the World "
+                    "Bank population); "
                     "for paper, their consumption from the JRC BAT reference "
                     "document is used."
                 ),
@@ -163,7 +163,10 @@ class IndustryProductionData(DatasetCollection):
         electricity."""
         carriers = [
             *self._calculate_fuel_inputs(element.sector).index,
-            *[element.heat_carrier(level) for level in self._active_heat_levels(element)],
+            *[
+                element.heat_carrier(level)
+                for level in self._active_heat_levels(element)
+            ],
             "electricity",
         ]
         return element.input_carrier.set_data(
@@ -194,10 +197,20 @@ class IndustryProductionData(DatasetCollection):
             for carrier, value in self.calculate_fuel_intensity(sector).items()
         ]
         cf.append(
-            {"electricity": {"default_value": round(energy["electricity"], 12), "unit": unit}}
+            {
+                "electricity": {
+                    "default_value": round(energy["electricity"], 12),
+                    "unit": unit,
+                }
+            }
         )
         cf += [
-            {element.heat_carrier(level): {"default_value": round(heat[level], 12), "unit": unit}}
+            {
+                element.heat_carrier(level): {
+                    "default_value": round(heat[level], 12),
+                    "unit": unit,
+                }
+            }
             for level in self._active_heat_levels(element)
         ]
         return element.conversion_factor.set_data(
@@ -314,7 +327,8 @@ class IndustryProductionData(DatasetCollection):
         shares = self.calculate_fuel_shares(element.sector)
         heat_fuels = shares[shares.index.isin(["natural_gas", "hard_coal"])]
         heat_fuels = heat_fuels / heat_fuels.sum()
-        unit = "GW/(kilotCO2/hour)"
+        # unit of the DEA capture unit, converted by ZEN-creator as for cement
+        unit = "GWh/kilotCO2"
         cf = [
             {
                 carrier: {
@@ -346,8 +360,8 @@ class IndustryProductionData(DatasetCollection):
         capture_rate = dea.get_capture_rate_CCS()
         intensity = float(CARBON_INTENSITY[element.sector])
         return element.retrofit_flow_coupling_factor.set_data(
-            default_value=round(intensity * capture_rate / 1000.0, 12),  # t -> kt
-            unit="kilotCO2/tproduct",
+            default_value=round(intensity * capture_rate, 12),
+            unit="tCO2/tproduct",
             base_technology=f"{element.sector}_production",
             source=SourceInformation(
                 description=(
@@ -373,13 +387,15 @@ class IndustryProductionData(DatasetCollection):
     def calculate_energy_intensity(self, sector: str) -> pd.Series:
         """Fuel (above 200 °C), heat and electricity demand (GW per t/h)."""
         parameters = self._sector_parameters.loc[sector]
-        energy = pd.Series({
-            "fuel": parameters["fuel"],
-            "heat_0_100": parameters["heat_0_100"],
-            "heat_100_200": parameters["heat_100_200"],
-            "heat": parameters["heat_0_100"] + parameters["heat_100_200"],
-            "electricity": parameters["electricity"],
-        })
+        energy = pd.Series(
+            {
+                "fuel": parameters["fuel"],
+                "heat_0_100": parameters["heat_0_100"],
+                "heat_100_200": parameters["heat_100_200"],
+                "heat": parameters["heat_0_100"] + parameters["heat_100_200"],
+                "electricity": parameters["electricity"],
+            }
+        )
         return energy / Constants.SECONDS_PER_HOUR  # GJ/t -> GW/(t/h)
 
     def calculate_fuel_intensity(self, sector: str) -> pd.Series:
@@ -392,21 +408,22 @@ class IndustryProductionData(DatasetCollection):
         energy = self.calculate_energy_intensity(sector)
         wolf = cast(Wolf2017, self.data["wolf2017"])
         split = wolf.get_temperature_split().loc[sector]
-        return pd.Series({
-            "0_100": energy["heat_0_100"],
-            "100_150": energy["heat_100_200"] * split["100_150"],
-            "150_200": energy["heat_100_200"] * split["150_200"],
-        })
+        return pd.Series(
+            {
+                "0_100": energy["heat_0_100"],
+                "100_150": energy["heat_100_200"] * split["100_150"],
+                "150_200": energy["heat_100_200"] * split["150_200"],
+            }
+        )
 
     def calculate_fuel_shares(self, sector: str) -> pd.Series:
         """Fuel mix of the sector's thermal energy (EU27), small fuels dropped."""
         idees = cast(JRCIDEES, self.data["jrc_idees"])
-        thermal = idees.get_industry_thermal_final_energy(
-            sector, self.settings.industry.data_year).loc[IDEES_EU]
-        shares = thermal / thermal.sum()
-        shares = shares[shares.index.isin(list(FUELS))]
+        thermal = idees.get_industry_thermal_final_energy_by_fuel(
+            sector, self.settings.industry.data_year, "production"
+        ).loc[IDEES_EU]
+        shares = (thermal / thermal.sum()).drop("other", errors="ignore")
         shares = shares[shares >= self.settings.industry.fuel_share_cutoff]
-        shares = shares.rename(FUELS)
         return shares / shares.sum()
 
     # ---------- helpers ----------
@@ -434,14 +451,23 @@ class IndustryProductionData(DatasetCollection):
         hours = self.settings.industry.operating_hours
         year = self.settings.industry.data_year
         idees = cast(JRCIDEES, self.data["jrc_idees"])
-        capacity = pd.DataFrame({
-            "glass": self._fill_proxy_nodes(
-                self._reindex_nodes(
-                    idees.get_industry_installed_capacity("glass", year), nodes)),
-            "ceramic": self._calculate_ceramic_output(nodes),
-            "paper": self._reindex_nodes(
-                idees.get_industry_installed_capacity("paper", year), nodes),
-        }) * 1000 / hours  # kt/a -> t/h
+        capacity = (
+            pd.DataFrame(
+                {
+                    "glass": self._fill_proxy_nodes(
+                        self._reindex_nodes(
+                            idees.get_industry_installed_capacity("glass", year), nodes
+                        )
+                    ),
+                    "ceramic": self._calculate_ceramic_output(nodes),
+                    "paper": self._reindex_nodes(
+                        idees.get_industry_installed_capacity("paper", year), nodes
+                    ),
+                }
+            )
+            * 1000
+            / hours
+        )  # kt/a -> t/h
         capacity["food"] = self._calculate_food_capacity(nodes)
         # paper: the consumption of the nodes without JRC-IDEES (JRC BAT)
         jrc_bat = cast(JRCBATPaper, self.data["jrc_bat_paper"])
@@ -454,14 +480,23 @@ class IndustryProductionData(DatasetCollection):
         """Physical production (t/h) averaged over the year, per node and sector."""
         year = self.settings.industry.data_year
         idees = cast(JRCIDEES, self.data["jrc_idees"])
-        production = pd.DataFrame({
-            "glass": self._fill_proxy_nodes(
-                self._reindex_nodes(
-                    idees.get_industry_physical_output("glass", year), nodes)),
-            "ceramic": self._calculate_ceramic_output(nodes),
-            "paper": self._reindex_nodes(
-                idees.get_industry_physical_output("paper", year), nodes),
-        }) * 1000.0 / Constants.HOURS_PER_YEAR  # kt/a -> t/h
+        production = (
+            pd.DataFrame(
+                {
+                    "glass": self._fill_proxy_nodes(
+                        self._reindex_nodes(
+                            idees.get_industry_physical_output("glass", year), nodes
+                        )
+                    ),
+                    "ceramic": self._calculate_ceramic_output(nodes),
+                    "paper": self._reindex_nodes(
+                        idees.get_industry_physical_output("paper", year), nodes
+                    ),
+                }
+            )
+            * 1000.0
+            / Constants.HOURS_PER_YEAR
+        )  # kt/a -> t/h
         production["food"] = self._calculate_food_capacity(nodes)
         return production
 
@@ -470,7 +505,10 @@ class IndustryProductionData(DatasetCollection):
         """Ceramic output (kt/a): JRC-IDEES thermal energy / Rehfeldt fuel intensity."""
         idees = cast(JRCIDEES, self.data["jrc_idees"])
         thermal = idees.get_industry_thermal_final_energy(
-            "ceramic", self.settings.industry.data_year).sum(axis=1)  # ktoe
+            "ceramic", self.settings.industry.data_year
+        ).sum(
+            axis=1
+        )  # ktoe
         intensity = self._sector_parameters.at["ceramic", "fuel_total"]  # GJ/t
         output = thermal * Constants.GJ_PER_KTOE / (intensity * 1000)
         return self._fill_proxy_nodes(self._reindex_nodes(output, nodes))
@@ -480,7 +518,9 @@ class IndustryProductionData(DatasetCollection):
         """Food capacity (t/h): Rehfeldt (2017) activity split by FAOSTAT production."""
         rehfeldt = cast(Rehfeldt2017, self.data["rehfeldt2017"])
         faostat = cast(FAOSTATFood, self.data["faostat_food"])
-        activity = rehfeldt.get_sub_processes("food").loc[list(FOOD_ITEMS), "activity_Mt"]
+        activity = rehfeldt.get_sub_processes("food").loc[
+            list(FOOD_ITEMS), "activity_Mt"
+        ]
         production = faostat.get_production(self.settings.industry.data_year)
         production = production.reindex(
             index=list(FOOD_ITEMS.values()),
@@ -498,11 +538,21 @@ class IndustryProductionData(DatasetCollection):
         return data.reindex(list(nodes), fill_value=0.0)
 
     def _fill_proxy_nodes(self, data: pd.Series) -> pd.Series:
-        """Fill the nodes without JRC-IDEES data from their proxy node."""
+        """Fill the nodes without JRC-IDEES data from their proxy node, scaled by
+        the population ratio for the nodes in POPULATION_SCALED."""
         data = data.copy()
-        for node, (proxy, factor) in PROXY_NODES.items():
-            data[node] = data[proxy] * factor
+        for node, proxy in PROXY_NODES.items():
+            data[node] = data[proxy] * self._proxy_factor(node, proxy)
         return data
+
+    def _proxy_factor(self, node: str, proxy: str) -> float:
+        """Population of `node` per population of `proxy` (World Bank)."""
+        if node not in POPULATION_SCALED:
+            return 1.0
+        worldbank = cast(WorldBankPopulation, self.data["worldbank_population"])
+        year = self.settings.industry.data_year
+        population = worldbank.get_population([node, proxy], [year])[year]
+        return float(population[node] / population[proxy])
 
     @cached_property
     def _sector_parameters(self) -> pd.DataFrame:
@@ -513,11 +563,13 @@ class IndustryProductionData(DatasetCollection):
         for sector in SECTORS:
             if sector == "glass":
                 energy = aidres.get_sub_processes_glass().rename(
-                    columns={"ng_GJ_t": "fuel"})
+                    columns={"ng_GJ_t": "fuel"}
+                )
                 weights = aidres.get_production_shares_glass()
             else:
                 energy = rehfeldt.get_sub_processes(sector).rename(
-                    columns={"fuels_GJ_t": "fuel"})
+                    columns={"fuels_GJ_t": "fuel"}
+                )
                 weights = rehfeldt.get_activity_weights(sector)
             temperatures = rehfeldt.get_sub_processes(sector)
             fuel = weights.dot(energy.loc[weights.index, "fuel"])
@@ -538,34 +590,52 @@ class IndustryProductionData(DatasetCollection):
         technologies"."""
         aidres = cast(Aidres, self.data["aidres"])
         rehfeldt = cast(Rehfeldt2017, self.data["rehfeldt2017"])
-        ecb = cast(ECBInflation, self.data["ecb"])
-        reference_year = self.settings.time.reference_year
         hours = Constants.HOURS_PER_YEAR
         costs = {
             "glass": self._calculate_jrc_costs(
-                "glass", aidres.get_production_shares_glass()),
+                "glass", aidres.get_production_shares_glass()
+            ),
             "paper": self._calculate_jrc_costs(
-                "paper", rehfeldt.get_activity_weights("paper")),
+                "paper", rehfeldt.get_activity_weights("paper")
+            ),
         }
-        costs["paper"]["capex"] = round(PAPER_CAPEX * hours, 2)  # Euro/(t/a) -> Euro/(t/h)
-        inflation = ecb.get_inflation_rate(BASE_YEAR, reference_year)
+        # Euro/(t/a) -> Euro/(t/h)
+        costs["paper"]["capex"] = round(
+            self._literature_cost("paper", "capex") * hours, 2
+        )
         costs["food"] = {
-            "capex": round(FOOD_COSTS["capex"] * inflation * hours, 2),
-            "opex_fixed": round(FOOD_COSTS["opex_fixed"] * inflation * hours, 2),
-            "opex_variable": 0.0,
-            "lifetime": FOOD_COSTS["lifetime"],
+            "capex": round(self._literature_cost("food", "capex") * hours, 2),
+            "opex_fixed": round(self._literature_cost("food", "opex_fixed") * hours, 2),
+            "opex_variable": self._literature_cost("food", "opex_variable"),
+            "lifetime": self._literature_cost("food", "lifetime"),
         }
         return pd.DataFrame.from_dict(costs, orient="index")
+
+    def _literature_cost(self, sector: str, parameter: str) -> float:
+        """Literature cost, inflated from its price year if it has one."""
+        literature = cast(
+            IndustryProductionCosts, self.data["industry_production_costs"]
+        )
+        value = literature.get_value(sector, parameter)
+        price_year = literature.get_price_year(sector, parameter)
+        if price_year is None:
+            return value
+        ecb = cast(ECBInflation, self.data["ecb"])
+        return value * ecb.get_inflation_rate(
+            price_year, self.settings.time.reference_year
+        )
 
     def _calculate_jrc_costs(self, sector: str, weights: pd.Series) -> dict[str, float]:
         """Weighted JRC-EU-TIMES costs of the sector's processes."""
         times = cast(JRCEUTIMESIndustry, self.data["jrc_eu_times_industry"])
         ecb = cast(ECBInflation, self.data["ecb"])
         inflation = ecb.get_inflation_rate(BASE_YEAR, self.settings.time.reference_year)
-        parameters = pd.DataFrame({
-            sub_process: times.get_process_parameters(process)
-            for sub_process, process in JRC_PROCESSES[sector].items()
-        })
+        parameters = pd.DataFrame(
+            {
+                sub_process: times.get_process_parameters(process)
+                for sub_process, process in JRC_PROCESSES[sector].items()
+            }
+        )
         weighted = parameters.dot(weights[parameters.columns])
         hours = Constants.HOURS_PER_YEAR
         return {
@@ -579,7 +649,8 @@ class IndustryProductionData(DatasetCollection):
     def _get_ceramic_cost(self, element: Element, method: str) -> Attribute:
         """Cost or lifetime of the Gardarsdottir et al. (2019) cement plant."""
         gardarsdottir = cast(
-            CementProductionGardarsdottir, self.data["cement_production_gardarsdottir"])
+            CementProductionGardarsdottir, self.data["cement_production_gardarsdottir"]
+        )
         return getattr(gardarsdottir, method)(element).set_data(
             source=AssumptionInformation(
                 description=(
@@ -600,35 +671,15 @@ class IndustryProductionData(DatasetCollection):
             f"Costs in {self.settings.time.reference_year} Euro using ECB HICP "
             "inflation, see docs, 'Production technologies'."
         )
+        literature = cast(
+            IndustryProductionCosts, self.data["industry_production_costs"]
+        )
         if sector == "food":
-            return AssumptionInformation(
-                description=(
-                    "No consistent food cost data exist. Capex of "
-                    f"{FOOD_COSTS['capex']} Euro/(t/a), fixed opex of "
-                    f"{FOOD_COSTS['opex_fixed']} Euro/(t/a), no variable opex and a "
-                    f"lifetime of {FOOD_COSTS['lifetime']} years "
-                    "are rounded from three mid-sized JRC-EU-TIMES processes (hollow "
-                    "glass, quicklime, copper finishing), as food plants are mostly "
-                    "low-temperature processing lines (JRC-EU-TIMES, "
-                    f"doi:10.2790/97596). {inflation}"
-                ),
-            )
+            description = literature.get_description(sector, attribute)
+            return AssumptionInformation(description=f"{description} {inflation}")
         if sector == "paper" and attribute == "capex":
             return AssumptionInformation(
-                description=(
-                    f"Capex of {PAPER_CAPEX} Euro/(t/a) (not inflated), a lower bound "
-                    "from brownfield conversions, since JRC-EU-TIMES (about 2,283 "
-                    "Euro/(t/a)) describes an integrated greenfield mill: Stora Enso "
-                    "Oulu (about 1,333 Euro/(t/a), https://www.storaenso.com/en/"
-                    "newsroom/regulatory-and-investor-releases/2022/10/stora-enso-"
-                    "invests-in-conversion-to-accelerate-growth-in-renewable-"
-                    "packaging), Stora Enso Langerbrugge (about 571 Euro/(t/a), "
-                    "https://paperage.com/2022news/06-07-2022stora-enso-langerbrugge-"
-                    "conversion.html) and Kotkamills BM2 (about 425-450 Euro/(t/a), "
-                    "https://www.asiapapermarkets.com/kotkamills-starts-up-new-"
-                    "consumer-board-machine-bm2-in-finland-capacity-400000-tyr-of-"
-                    "nordic-folding-boxboard-and-recyclable-barrier-board/)."
-                ),
+                description=literature.get_description(sector, attribute),
             )
         descriptions = {
             "glass": (
