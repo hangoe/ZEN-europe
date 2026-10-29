@@ -28,7 +28,8 @@ if TYPE_CHECKING:
 class KilnFuelIndustry:
     """Supply of a glass or ceramic kiln with natural gas, hydrogen or electricity.
 
-    Without capex: only the choice of the fuel is modeled.
+    Without capex: only the choice of the fuel is modeled (AIDRES capex difference
+    to the natural gas route ~0, see docs).
     """
 
     sector: ClassVar[str]

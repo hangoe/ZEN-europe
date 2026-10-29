@@ -1,10 +1,3 @@
-#	- Redefine sector in paper, ceramic, glass, food (not industry_tes, dsm, heat)
-#		○ zen_garden_base has these sectors, but you have a model without them
-#		○ Work with removing technologies then
-#		○ Use dsm_shiftability to remove dsm
-#remove_technologies: &low_band_heat_pumps: I don’t get this (how does it work?)
-
-
 # Model variants: settings patches on top of zen_europe_config.yaml.
 defaults:
   settings:
@@ -25,72 +18,64 @@ defaults:
         - steel
         - passenger_transport
         - truck_transport
-        - industry_heat
-        - industry_tes
-        - industry_dsm
+        - glass
+        - ceramic
+        - paper
+        - food
 
 models:
-  # ZEN-europe base: no industrial heat (paper, ceramic, glass, food) and no TES/DSM
-  zen_europe_base:
+  # ZEN-europe base: glass, ceramic, paper and food with full flexibility (thermal
+  # energy storage and demand-side management)
+  zen_europe_base: {}
+
+  # the original ZEN-europe: no industrial heat (paper, ceramic, glass, food), no
+  # TES and no DSM
+  zen_europe_no_industry_heat:
     settings:
       structure:
-        remove_sectors: [industry_heat, industry_tes, industry_dsm]
+        remove_sectors: [glass, ceramic, paper, food]
+      industry_flexibility:
+        use_tes: false
+        dsm_shiftability: none
 
-  # full flexibility: thermal energy storage and demand-side management
-  zen_europe_ind_heat_v1_full_flexibility: {}
-
-  zen_europe_ind_heat_v1_no_flexibility:
+  zen_europe_ind_heat_no_flexibility:
     settings:
-      structure:
-        remove_sectors: [industry_tes, industry_dsm]
+      industry_flexibility:
+        use_tes: false
+        dsm_shiftability: none
 
-  zen_europe_ind_heat_v1_no_flexibility_nodiffusion:
-    extends: zen_europe_ind_heat_v1_no_flexibility
+  zen_europe_ind_heat_no_flexibility_nodiffusion:
+    extends: zen_europe_ind_heat_no_flexibility
     settings:
       investment:
         use_diffusion_rates: false
 
-  zen_europe_ind_heat_v1_TES_only:
+  zen_europe_ind_heat_TES_only:
     settings:
-      structure:
-        remove_sectors: [industry_dsm]
+      industry_flexibility:
+        dsm_shiftability: none
 
-  zen_europe_ind_heat_v1_DSM_only:
+  zen_europe_ind_heat_DSM_only:
     settings:
-      structure:
-        remove_sectors: [industry_tes]
+      industry_flexibility:
+        use_tes: false
 
   # DSM only, with the pessimistic DSM shiftability categories
-  zen_europe_ind_heat_v1_DSM_pessimistic:
-    extends: zen_europe_ind_heat_v1_DSM_only
+  zen_europe_ind_heat_DSM_pessimistic:
+    extends: zen_europe_ind_heat_DSM_only
     settings:
-      industry:
+      industry_flexibility:
         dsm_shiftability: pessimistic
 
-  # only the highest temperature band has heat pumps
-  zen_europe_ind_heat_v1_full_flexibility_single_temp:
+  # only the highest temperature band has heat pumps, the lower bands are supplied
+  # via the temperature cascade
+  zen_europe_ind_heat_single_temp:
     settings:
-      structure:
-        remove_technologies: &low_band_heat_pumps
-          - heat_pump_industry_0_100_waste_heat_glass
-          - heat_pump_industry_0_100_water_glass
-          - heat_pump_industry_100_150_waste_heat_glass
-          - heat_pump_industry_100_150_water_glass
-          - heat_pump_industry_0_100_waste_heat_ceramic
-          - heat_pump_industry_0_100_water_ceramic
-          - heat_pump_industry_100_150_waste_heat_ceramic
-          - heat_pump_industry_100_150_water_ceramic
-          - heat_pump_industry_0_100_waste_heat_paper
-          - heat_pump_industry_0_100_water_paper
-          - heat_pump_industry_100_150_waste_heat_paper
-          - heat_pump_industry_100_150_water_paper
-          - heat_pump_industry_0_100_waste_heat_food
-          - heat_pump_industry_0_100_water_food
-          - heat_pump_industry_100_150_waste_heat_food
-          - heat_pump_industry_100_150_water_food
+      industry_flexibility:
+        heat_pump_temp_levels: ["150_200"]
 
-  zen_europe_ind_heat_v1_no_flexibility_single_temp:
-    extends: zen_europe_ind_heat_v1_no_flexibility
+  zen_europe_ind_heat_no_flexibility_single_temp:
+    extends: zen_europe_ind_heat_no_flexibility
     settings:
-      structure:
-        remove_technologies: *low_band_heat_pumps
+      industry_flexibility:
+        heat_pump_temp_levels: ["150_200"]

@@ -68,10 +68,11 @@ freight mileage, steel, cement, ammonia, methanol, olefins, fuels for aviation
 and shipping). The model decides on the investment in and operation of all
 technologies that supply these demands.
 
-The optional sector ``industry_heat`` adds glass, ceramic, paper and food
-production together with their process heat supply, and the optional sectors
-``industry_tes`` and ``industry_dsm`` add thermal energy storage and
-demand-side management of industrial products (see
+The sectors ``glass``, ``ceramic``, ``paper`` and ``food`` add the production
+of these products together with their process heat supply, thermal energy
+storage and demand-side management. Thermal energy storage, demand-side
+management of all industrial products and the temperature bands with heat
+pumps are switched by the ``industry_flexibility`` settings (see
 :doc:`../user_guide/industry`).
 
 ..

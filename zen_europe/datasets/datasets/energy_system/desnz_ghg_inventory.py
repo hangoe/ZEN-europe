@@ -49,8 +49,8 @@ SECTOR_CATEGORIES = {
         ("Industry", "Industrial fuel combustion", "Iron and steel production"),
     ],
     # glass and ceramics processes
-    "industry_heat": [
-        ("Industry", "Industrial processes", "Glass production"),
+    "glass": [("Industry", "Industrial processes", "Glass production")],
+    "ceramic": [
         ("Industry", "Industrial processes", "Bricks production"),
         ("Industry", "Industrial processes", "Other ceramics"),
     ],

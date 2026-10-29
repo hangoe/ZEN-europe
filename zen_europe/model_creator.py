@@ -16,6 +16,7 @@ from .elements.storage_technologies import PumpedHydro  # noqa: F401
 from .elements.transport_technologies import PowerLine  # noqa: F401
 from .global_scenarios import define_global_scenarios
 from .settings.cache import set_active_cache_settings
+from .utils.industry import remove_inactive_industry_elements
 
 # the data folder of the repository, which holds the configuration, the models
 # file, the raw data and the generated datasets
@@ -70,6 +71,7 @@ def create_model(
     set_active_cache_settings(model.settings.cache)
     model.output_folder = Path(resolved_output_folder)
     model.name = name
+    remove_inactive_industry_elements(model)
 
     # apply changes
     model.build()

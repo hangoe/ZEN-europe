@@ -26,7 +26,7 @@ class IndustryTES:
     temp_level: ClassVar[str]
     storage_type: ClassVar[str]
     # Brown et al. (2018) technology for the self-discharge
-    self_discharge_proxy: ClassVar[str] = "hot water tank decentral"
+    self_discharge_proxy: ClassVar[str] = "hot water tank central"
 
     def __init__(self, model: Model, power_unit: str = "MW"):
         super().__init__(model=model, power_unit=power_unit)

@@ -8,6 +8,11 @@ from zen_creator.datasets.datasets.metadata import MetaData
 
 # Emissions are reported in kt, the carbon budget is accounted in Gt.
 _KT_PER_GT = 1e6
+# ZEN-europe sector of each ONS industry
+_SECTOR_ROWS = {
+    "paper": "paper (SIC 17)",
+    "food": "food, beverages and tobacco (SIC 10-12)",
+}
 
 
 class ONSIndustryEmissions(Dataset[pd.DataFrame]):
@@ -51,7 +56,6 @@ class ONSIndustryEmissions(Dataset[pd.DataFrame]):
         return data
 
     def get_emissions_sectors(self, sectors: list[str]) -> pd.DataFrame:
-        """Emissions in Gt by industry, empty unless `industry_heat` is modeled."""
-        if "industry_heat" not in sectors:
-            return self.data.iloc[:0]
-        return self.data / _KT_PER_GT
+        """Emissions in Gt of the modeled sectors among `paper` and `food`."""
+        rows = [row for sector, row in _SECTOR_ROWS.items() if sector in sectors]
+        return self.data.loc[rows] / _KT_PER_GT

@@ -29,6 +29,7 @@ from zen_europe.datasets.datasets.technology.industry_general_assumptions import
 )
 from zen_europe.utils.industry import (
     BOILER_FUELS,
+    DATA_YEAR,
     HEAT_LEVELS,
     HEAT_SOURCES,
     SECTORS,
@@ -43,12 +44,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# boilers whose fuel mix is fitted to the sectors' JRC-IDEES fuel mix
+# boilers with an existing fleet; no existing electrode boilers
 COMBUSTION_FUELS = [fuel for fuel in BOILER_FUELS if fuel != "electrode"]
-# iterative proportional fitting of the sectors' boiler fuel mix
-FIT_SEED_FLOOR = 1e-3
-FIT_MAX_ITERATIONS = 1000
-FIT_TOLERANCE = 1e-10
+# Eurostat aggregate for nodes without paper biomass and waste data
+EUROSTAT_EU = "EU27_2020"
 
 
 class IndustryHeatSupply(DatasetCollection):
@@ -89,17 +88,15 @@ class IndustryHeatSupply(DatasetCollection):
         """
         Get the existing capacity of an industrial boiler.
 
-        The sectors' heat demand is split by fuel such that every fuel sums to the
-        node's industrial heat production mix (Eurostat, BFE for CH) and every
-        sector keeps its JRC-IDEES fuel mix as closely as possible.
+        The sector's heat demand is split by the sector's JRC-IDEES fuel mix in
+        the node (BFE for CH).
         """
         capacity = self._calculate_boiler_capacity(model_nodes(element)).loc[
             element.sector, element.fuel
         ]
         # drop the smallest boilers of a node
-        capacity = capacity.where(
-            capacity >= self.settings.industry.min_boiler_capacity, 0.0
-        )
+        min_capacity = self._assumptions.get_value("min_boiler_capacity")
+        capacity = capacity.where(capacity >= min_capacity, 0.0)
         return element.capacity_existing.set_data(
             default_value=0.0,
             unit="GW",
@@ -107,11 +104,14 @@ class IndustryHeatSupply(DatasetCollection):
             source=SourceInformation(
                 description=(
                     "The existing boiler capacity equals the sector's heat demand "
-                    "(0-200 °C), split by fuel with an iterative proportional fit "
-                    "of the sectors' JRC-IDEES fuel mix to the node's gross heat "
-                    "production per fuel (Eurostat, BFE for CH). Boilers below "
-                    f"{self.settings.industry.min_boiler_capacity} GW per node "
-                    "(setting industry.min_boiler_capacity) are dropped; the "
+                    "(0-200 °C), split by the sector's JRC-IDEES fuel mix in the "
+                    "country (EU27 for NO and UK; BFE industry fuel mix for CH). "
+                    "'Biomass and waste' is biomass, except in paper, where it is "
+                    "split by the Eurostat paper industry final consumption "
+                    "(FC_IND_PPP_E). There are no existing electrode boilers. "
+                    "Boilers below "
+                    f"{min_capacity} GW per node (general industry assumptions) "
+                    "are dropped; the "
                     "capacity is assumed to be built evenly over the lifetime of the "
                     "technology."
                 ),
@@ -130,10 +130,7 @@ class IndustryHeatSupply(DatasetCollection):
         )
         if element.heat_source != "waste_heat":
             return capex
-        assumptions = cast(
-            IndustryGeneralAssumptions, self.data["industry_general_assumptions"]
-        )
-        recovery = assumptions.get_value("waste_heat_recovery_capex")
+        recovery = self._assumptions.get_value("waste_heat_recovery_capex")
         return capex.set_data(
             default_value=capex.default_value + recovery,
             df=None if capex.df is None else capex.df + recovery,
@@ -143,7 +140,7 @@ class IndustryHeatSupply(DatasetCollection):
                     "Agency, Technology Data for Industrial Process Heat, "
                     "https://www.ens.dk/technologydata) plus an assumed "
                     f"{recovery} Euro/kW for the waste-heat recovery, "
-                    + assumptions.get_description("waste_heat_recovery_capex")
+                    + self._assumptions.get_description("waste_heat_recovery_capex")
                 ),
             ),
         )
@@ -169,7 +166,7 @@ class IndustryHeatSupply(DatasetCollection):
                 "Waste heat of processes > 200 °C (their fuel demand), split by band "
                 "heat demand. "
             )
-        first_share = self.settings.industry.hp_share_first_year
+        first_share = self._assumptions.get_value("hp_share_first_year")
         demand = self._calculate_band_demand(tuple(nodes)).loc[
             (element.sector, element.temp_level)
         ]
@@ -189,7 +186,7 @@ class IndustryHeatSupply(DatasetCollection):
                 description=(
                     description
                     + f"{years[0]}: at most {first_share:.0%} of band demand per node "
-                    "(setting industry.hp_share_first_year), split by heat source."
+                    "(general industry assumptions), split by heat source."
                 ),
                 metadata=self.metadata,
             ),
@@ -205,7 +202,7 @@ class IndustryHeatSupply(DatasetCollection):
         share = demand[element.sector, element.temp_level] / demand.sum()
         heat_sources = len(HEAT_SOURCES)
         interval = self.settings.time.interval_between_years
-        seed_years = self.settings.industry.hp_seed_years
+        seed_years = self._assumptions.get_value("hp_seed_years")
         return element.capacity_addition_unbounded.set_data(
             default_value=(
                 fleet / seed_years * interval * share / heat_sources / len(nodes)
@@ -214,7 +211,7 @@ class IndustryHeatSupply(DatasetCollection):
             source=SourceInformation(
                 description=(
                     f"Annual build-out of the DH heat pumps (fleet / {seed_years} yr, "
-                    "setting industry.hp_seed_years) per period, split by sector-band "
+                    "general industry assumptions) per period, split by sector-band "
                     "demand share, heat source and node, see docs, 'Diffusion'."
                 ),
                 metadata=self.metadata,
@@ -257,7 +254,7 @@ class IndustryHeatSupply(DatasetCollection):
         levels = HEAT_LEVELS[: HEAT_LEVELS.index(element.temp_level) + 1]
         nodes = model_nodes(element)
         demand = self._calculate_heat_demand(element.sector, levels, nodes)
-        margin = self.settings.industry.capacity_limit_margin
+        margin = self._assumptions.get_value("capacity_limit_margin")
         limit = (demand * margin).reindex(pd.Index(nodes, name="node")).fillna(0.0)
         return element.capacity_limit.set_data(
             default_value=np.inf,
@@ -267,7 +264,7 @@ class IndustryHeatSupply(DatasetCollection):
                 description=(
                     "The flat heat demand of the storage's band and all lower bands "
                     "(reachable via the temperature cascade) times the capacity limit "
-                    f"margin of {margin} (setting industry.capacity_limit_margin); "
+                    f"margin of {margin} (general industry assumptions); "
                     "0 at nodes without demand."
                 ),
                 metadata=self.metadata,
@@ -326,9 +323,15 @@ class IndustryHeatSupply(DatasetCollection):
 
     # ---------- helpers ----------
 
+    @property
+    def _assumptions(self) -> IndustryGeneralAssumptions:
+        return cast(
+            IndustryGeneralAssumptions, self.data["industry_general_assumptions"]
+        )
+
     def _set_capacity_limit(self, element: Element, demand: pd.Series) -> Attribute:
         """Limit the zero-cost pass-through technologies, see docs, 'Diffusion'."""
-        margin = self.settings.industry.capacity_limit_margin
+        margin = self._assumptions.get_value("capacity_limit_margin")
         limit = (demand * margin).rename("capacity_limit")
         return element.capacity_limit.set_data(
             default_value=np.inf,
@@ -337,7 +340,7 @@ class IndustryHeatSupply(DatasetCollection):
             source=SourceInformation(
                 description=(
                     f"The flat demand times the capacity limit margin of {margin} "
-                    "(setting industry.capacity_limit_margin), see docs, 'Diffusion'."
+                    "(general industry assumptions), see docs, 'Diffusion'."
                 ),
                 metadata=self.metadata,
             ),
@@ -369,120 +372,65 @@ class IndustryHeatSupply(DatasetCollection):
 
     @cache
     def _calculate_boiler_capacity(self, nodes: tuple[str, ...]) -> pd.DataFrame:
-        """
-        Boiler capacity (GW) per sector and node (rows) and fuel (columns).
-
-        The sectors' heat demand is split such that every fuel sums to the node's
-        pooled capacity (Eurostat, BFE) and every sector to its own heat demand, with
-        the sectors' JRC-IDEES fuel mix deciding who gets which fuel.
-        """
+        """Boiler capacity (GW) per sector and node (rows) and fuel (columns): the
+        sector's heat demand split by its fuel mix."""
         production = self._production_data
         # production capacity basis, as the heat carriers
-        demand = pd.DataFrame(
+        demand = pd.concat(
             {
                 sector: production.calculate_demand(sector, nodes)
                 * production.calculate_energy_intensity(sector)["heat"]
                 for sector in SECTORS
-            }
-        )  # node x sector
-        total = demand.sum(axis=1)
-        pooled = self._calculate_boiler_fuel_shares(nodes).mul(total, axis=0)
-        # electrode boilers are split by the sectors' heat demand
-        electrode = (
-            demand.div(total.where(total > 0), axis=0)
-            .fillna(0.0)
-            .mul(pooled["electrode"], axis=0)
+            },
+            names=["sector", "node"],
         )
-        seed = self._calculate_initial_fuel_shares(pooled, nodes)
-        capacity = {}
-        for node in nodes:
-            fitted = _fit_fuel_matrix(
-                seed.xs(node, level="node"),
-                demand.loc[node] - electrode.loc[node],
-                pooled.loc[node, COMBUSTION_FUELS],
-            )
-            fitted["electrode"] = electrode.loc[node]
-            capacity[node] = fitted
-        capacity = pd.concat(capacity, names=["node", "sector"])
-        return capacity.swaplevel().sort_index()[list(BOILER_FUELS)]
+        shares = self._calculate_sector_fuel_shares(nodes)
+        return shares.mul(demand.reindex(shares.index, fill_value=0.0), axis=0)
 
-    def _calculate_boiler_fuel_shares(self, nodes: tuple[str, ...]) -> pd.DataFrame:
-        """Fuel shares of the industrial heat production per node."""
-        eurostat = cast(Eurostat, self.data["eurostat"])
-        bfe = cast(BFEIndustry, self.data["bfe_industry"])
-        year = self.settings.industry.data_year
-        heat = eurostat.get_heat_production_industry(year).rename(
-            columns={"electricity": "electrode"}
-        )
-        heat = heat.reindex(
-            index=list(nodes), columns=list(BOILER_FUELS), fill_value=0.0
-        )
-        # CH: fuel consumption of the BFE industry branches, no electrode boilers
-        if "CH" in heat.index:
-            heat.loc["CH"] = bfe.get_fuel_consumption(year).reindex(
-                BOILER_FUELS, fill_value=0.0
-            )
-        total = heat.sum(axis=1)
-        shares = heat.div(total.where(total > 0), axis=0)
-        # nodes without heat production are assumed to burn natural gas
-        shares.loc[total <= 0] = [float(fuel == "natural_gas") for fuel in BOILER_FUELS]
-        return shares
-
-    def _calculate_initial_fuel_shares(
-        self, pooled: pd.DataFrame, nodes: tuple[str, ...]
-    ) -> pd.DataFrame:
-        """Combustion fuel mix per sector and node (JRC-IDEES, else EU27)."""
+    def _calculate_sector_fuel_shares(self, nodes: tuple[str, ...]) -> pd.DataFrame:
+        """Boiler fuel mix per sector and node (JRC-IDEES, else EU27; BFE for CH)."""
         idees = cast(JRCIDEES, self.data["jrc_idees"])
         countries = [
             IDEES_EU if node in NODES_WITHOUT_IDEES else node for node in nodes
         ]
-        # waste share of the node's pooled biomass and waste capacity
-        biomass_and_waste = pooled["biomass"] + pooled["waste"]
-        waste_share = (
-            pooled["waste"] / biomass_and_waste.where(biomass_and_waste > 0)
-        ).fillna(0.0)
+        node_index = pd.Index(list(nodes), name="node")
+        paper_waste_share = self._calculate_paper_waste_share(nodes)
         shares = {}
         for sector in SECTORS:
             thermal = idees.get_industry_thermal_final_energy_by_fuel(
-                sector, self.settings.industry.data_year, "boiler"
+                sector, DATA_YEAR, "boiler"
             ).loc[countries]
-            thermal.index = pd.Index(list(nodes), name="node")
-            fuels = thermal.reindex(columns=COMBUSTION_FUELS, fill_value=0.0)
-            # biomass and waste are split by the node's biomass:waste heat production
+            thermal.index = node_index
+            fuels = thermal.reindex(columns=list(BOILER_FUELS), fill_value=0.0)
+            # JRC-IDEES reports biomass and waste as one carrier; only the paper
+            # industry burns waste (sludge, rejects)
             biomass_and_waste = thermal.get("biomass_and_waste", 0.0)
+            waste_share = paper_waste_share if sector == "paper" else 0.0
             fuels["biomass"] += biomass_and_waste * (1.0 - waste_share)
             fuels["waste"] += biomass_and_waste * waste_share
             total = fuels.sum(axis=1)
             fuels = fuels.div(total.where(total > 0), axis=0)
             # equal shares if the sector consumes no fuel at the node
-            shares[sector] = fuels.fillna(1.0 / len(COMBUSTION_FUELS))
-        return pd.concat(shares, names=["sector", "node"])
-
-
-def _fit_fuel_matrix(
-    seed: pd.DataFrame, row_totals: pd.Series, column_totals: pd.Series
-) -> pd.DataFrame:
-    """Scale `seed` (sector x fuel) to the row and column totals (iterative
-    proportional fitting)."""
-    seed = seed.loc[row_totals.index, column_totals.index]
-    matrix = seed.to_numpy() + FIT_SEED_FLOOR
-    rows_target = row_totals.to_numpy()
-    columns_target = column_totals.to_numpy()
-    tolerance = FIT_TOLERANCE * max(1.0, rows_target.sum())
-    with np.errstate(divide="ignore", invalid="ignore"):
-        for _ in range(FIT_MAX_ITERATIONS):
-            rows = matrix.sum(axis=1)
-            matrix = np.where(
-                rows[:, None] > 0, matrix * (rows_target / rows)[:, None], 0.0
+            fuels[COMBUSTION_FUELS] = fuels[COMBUSTION_FUELS].fillna(
+                1.0 / len(COMBUSTION_FUELS)
             )
-            columns = matrix.sum(axis=0)
-            matrix = np.where(columns > 0, matrix * columns_target / columns, 0.0)
-            column_error = np.abs(columns - columns_target).max()
-            row_error = np.abs(matrix.sum(axis=1) - rows_target).max()
-            if max(column_error, row_error) <= tolerance:
-                break
-        else:
-            logger.warning(
-                f"Boiler fuel fit did not converge in {FIT_MAX_ITERATIONS} iterations."
+            shares[sector] = fuels.fillna(0.0)
+        shares = pd.concat(shares, names=["sector", "node"])
+        # CH: fuel mix of the BFE industry branches for all sectors
+        if "CH" in nodes:
+            bfe = cast(BFEIndustry, self.data["bfe_industry"])
+            ch = bfe.get_fuel_consumption(DATA_YEAR).reindex(
+                BOILER_FUELS, fill_value=0.0
             )
-    return pd.DataFrame(matrix, index=seed.index, columns=seed.columns)
+            ch_rows = shares.index.get_level_values("node") == "CH"
+            shares.loc[ch_rows] = (ch / ch.sum()).to_numpy()
+        return shares[list(BOILER_FUELS)]
+
+    def _calculate_paper_waste_share(self, nodes: tuple[str, ...]) -> pd.Series:
+        """Waste share of the paper industry's biomass and waste per node (Eurostat),
+        EU27 where a node has no data, 0 if neither is available."""
+        eurostat = cast(Eurostat, self.data["eurostat"])
+        share = eurostat.get_paper_waste_share(DATA_YEAR)
+        fallback = share.get(EUROSTAT_EU, np.nan)
+        fallback = 0.0 if pd.isna(fallback) else float(fallback)
+        return share.reindex(list(nodes)).fillna(fallback).rename_axis("node")

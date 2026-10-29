@@ -18,6 +18,7 @@ from zen_europe.datasets.dataset_collections.industry_production_data import (
 from zen_europe.datasets.datasets.carrier.jrc_bat_paper import JRCBATPaper
 from zen_europe.datasets.datasets.carrier.rehfeldt2017 import Rehfeldt2017
 from zen_europe.datasets.datasets.carrier.wolf2017 import Wolf2017
+from zen_europe.datasets.datasets.financial.ECB import ECBInflation
 from zen_europe.datasets.datasets.technology.brown2018 import Brown2018
 from zen_europe.datasets.datasets.technology.dsm_literature_review import (
     DSMLiteratureReview,
@@ -26,7 +27,7 @@ from zen_europe.datasets.datasets.technology.jrc_eu_times_industry import (
     JRCEUTIMESIndustry,
 )
 from zen_europe.utils.constants import Constants
-from zen_europe.utils.industry import SECTORS
+from zen_europe.utils.industry import DATA_YEAR, SECTORS
 from zen_europe.utils.utils import (
     calculate_capacity_addition_from_cumulative,
     format_capacity_existing,
@@ -65,6 +66,16 @@ def test_unknown_process_raises() -> None:
         JRCEUTIMESIndustry(RAW_DATA_PATH).get_process_parameters("NOT_A_PROCESS")
 
 
+def test_heat_bands_are_useful_heat(production: IndustryProductionData) -> None:
+    """The heat bands are the final energy below 200 °C times the reference boiler
+    efficiency; the fuel above 200 °C stays final energy."""
+    efficiency = production._assumptions.get_value("reference_boiler_efficiency")
+    parameters = production._sector_parameters
+    final_heat = parameters["fuel_total"] - parameters["fuel"]
+    heat = parameters["heat_0_100"] + parameters["heat_100_200"]
+    assert heat.to_numpy() == pytest.approx((final_heat * efficiency).to_numpy())
+
+
 def test_fuel_shares(production: IndustryProductionData) -> None:
     for sector in SECTORS:
         shares = production.calculate_fuel_shares(sector)
@@ -92,31 +103,89 @@ def test_demand_of_nodes_without_jrc_idees(production: IndustryProductionData) -
     assert glass["CH"] == glass["AT"] and glass["NO"] == glass["FI"]
     paper = production.calculate_demand("paper", NODES)
     consumption = JRCBATPaper(RAW_DATA_PATH).get_consumption()
-    hours = production.settings.industry.operating_hours
+    hours = Constants.HOURS_PER_YEAR
     assert paper["UK"] == pytest.approx(consumption["UK"] * 1000 / hours)
 
 
-def test_boiler_capacity_matches_demand_and_fuel_totals(
+def test_demand_is_physical_output(production: IndustryProductionData) -> None:
+    """Demand over the year equals the JRC-IDEES physical output (glass, paper)."""
+    idees = production.data["jrc_idees"]
+    year = DATA_YEAR
+    for sector in ("glass", "paper"):
+        output = idees.get_industry_physical_output(sector, year)  # type: ignore[attr-defined]
+        nodes = [n for n in output.index if n in NODES]
+        demand = production.calculate_demand(sector, NODES)[nodes]
+        assert demand.sum() * Constants.HOURS_PER_YEAR / 1000 == pytest.approx(
+            output[nodes].sum()
+        )
+
+
+def test_capacity_existing_has_headroom(production: IndustryProductionData) -> None:
+    """Glass and paper plants have installed capacity above today's production."""
+    capacity = production._calculate_capacity(NODES)
+    for sector in ("glass", "paper"):
+        demand = production.calculate_demand(sector, NODES)
+        assert (capacity[sector] >= demand - 1e-9).all()
+        assert 1.1 < capacity[sector].sum() / demand.sum() < 1.4
+    for sector in ("ceramic", "food"):
+        assert capacity[sector].equals(
+            production.calculate_demand(sector, NODES).rename(sector)
+        )
+
+
+def test_kiln_fuel_capacity_matches_demand(
+    heat_supply: IndustryHeatSupply, production: IndustryProductionData
+) -> None:
+    """Existing kiln natural gas capacity and kiln fuel limit share one basis."""
+    for sector in ("glass", "ceramic"):
+        intensity = production.calculate_fuel_intensity(sector)[
+            f"fuel_to_kiln_{sector}"
+        ]
+        assert (
+            production.calculate_production(sector, NODES) * intensity
+        ).to_numpy() == pytest.approx(
+            (production.calculate_demand(sector, NODES) * intensity).to_numpy()
+        )
+
+
+def test_boiler_capacity_matches_sector_demand(
     heat_supply: IndustryHeatSupply, production: IndustryProductionData
 ) -> None:
     capacity = heat_supply._calculate_boiler_capacity(NODES)
-    demand = pd.DataFrame(
-        {
-            s: production.calculate_demand(s, NODES)
-            * production.calculate_energy_intensity(s)["heat"]
-            for s in SECTORS
-        }
-    )
-    pooled = heat_supply._calculate_boiler_fuel_shares(NODES)
-    for node in ("DE", "SE", "CH"):
-        node_capacity = capacity.xs(node, level="node")
-        assert node_capacity.sum(axis=1)[list(SECTORS)].to_numpy() == pytest.approx(
-            demand.loc[node, list(SECTORS)].to_numpy()
+    for sector in SECTORS:
+        demand = (
+            production.calculate_demand(sector, NODES)
+            * production.calculate_energy_intensity(sector)["heat"]
         )
-        assert node_capacity.sum().to_numpy() == pytest.approx(
-            (demand.loc[node].sum() * pooled.loc[node])[
-                node_capacity.columns
-            ].to_numpy()
+        assert capacity.loc[sector].sum(axis=1).to_numpy() == pytest.approx(
+            demand.reindex(capacity.loc[sector].index).to_numpy()
+        )
+
+
+def test_boiler_fuel_mix_is_not_district_heating(
+    heat_supply: IndustryHeatSupply,
+) -> None:
+    """Existing boilers follow the sectors' own fuel mix: no electrode boilers,
+    waste only in paper (outside CH, which uses the BFE mix) and a small waste
+    share overall."""
+    capacity = heat_supply._calculate_boiler_capacity(NODES)
+    assert (capacity["electrode"] == 0).all()
+    for sector in ("glass", "ceramic", "food"):
+        assert (capacity.loc[sector, "waste"].drop("CH") == 0).all()
+    total = capacity.groupby(level="node").sum()
+    waste_share = total["waste"] / total.sum(axis=1)
+    for node in ("DE", "SE"):
+        assert waste_share[node] < 0.10
+
+
+def test_boiler_fuel_mix_of_ch_is_bfe(heat_supply: IndustryHeatSupply) -> None:
+    shares = heat_supply._calculate_sector_fuel_shares(NODES)
+    bfe = heat_supply.data["bfe_industry"].get_fuel_consumption(DATA_YEAR)
+    expected = bfe.reindex(shares.columns, fill_value=0.0)
+    expected = expected / expected.sum()
+    for sector in SECTORS:
+        assert shares.loc[(sector, "CH")].to_numpy() == pytest.approx(
+            expected.to_numpy()
         )
 
 
@@ -142,8 +211,41 @@ def test_capacity_existing_uses_shared_vintages(
     years = vintages.index.get_level_values("year_construction")
     assert years.max() == reference_year - 1
     assert vintages.groupby(level="node").sum()["DE"] == pytest.approx(
-        production.calculate_demand("glass", NODES)["DE"]
+        capacity.loc["DE", reference_year - 1]
     )
+
+
+def test_costs_are_in_price_year_euro(
+    production: IndustryProductionData, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Production costs are inflated to `cost.price_year`, as all other costs, and
+    do not depend on `time.reference_year`."""
+
+    def costs(price_year: int, reference_year: int) -> pd.DataFrame:
+        # the collection is a singleton: swap its settings and drop cached costs
+        settings = Settings.model_validate(
+            {
+                "cost": {"price_year": price_year},
+                "time": {"reference_year": reference_year},
+            }
+        )
+        monkeypatch.setattr(production, "settings", settings)
+        production.__dict__.pop("_costs", None)
+        return production._costs
+
+    try:
+        base = costs(2022, 2022)
+        pd.testing.assert_frame_equal(costs(2022, 2020), base)
+        inflated = costs(2025, 2022)
+    finally:
+        monkeypatch.undo()
+        production.__dict__.pop("_costs", None)
+    inflation = ECBInflation(RAW_DATA_PATH).get_inflation_rate(2022, 2025)
+    for sector in ("glass", "food"):
+        assert inflated.at[sector, "capex"] == pytest.approx(
+            base.at[sector, "capex"] * inflation, rel=1e-3
+        )
+    assert inflated.at["glass", "lifetime"] == base.at["glass", "lifetime"]
 
 
 def test_dsm_shiftability() -> None:
@@ -153,7 +255,7 @@ def test_dsm_shiftability() -> None:
 
     def cost(carrier: str, shiftability: str) -> float:
         settings = Settings.model_validate(
-            {"industry": {"dsm_shiftability": shiftability}}
+            {"industry_flexibility": {"dsm_shiftability": shiftability}}
         )
         element = SimpleNamespace(carrier=carrier, settings=settings)
         return review._get_cost(element, "capex")  # type: ignore[arg-type]
@@ -168,7 +270,8 @@ def test_dsm_shiftability() -> None:
 
 def test_tes_self_discharge_brown2018() -> None:
     brown = Brown2018(RAW_DATA_PATH)
-    assert brown.data.at["hot water tank decentral", "tau_days"] == 3
+    assert brown.data.at["hot water tank central", "tau_days"] == 180
+    assert Brown2018.hourly_self_discharge(180) == pytest.approx(2.315e-4, rel=1e-3)
     assert Brown2018.hourly_self_discharge(3) == pytest.approx(0.013793, rel=1e-4)
     assert Brown2018.hourly_self_discharge(20 / 24) == pytest.approx(0.0488, rel=1e-3)
 

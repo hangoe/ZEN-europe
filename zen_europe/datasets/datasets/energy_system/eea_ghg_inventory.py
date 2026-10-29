@@ -43,12 +43,10 @@ SECTOR_CODES = {
     "aviation": ["1.A.3.a", "1.D.1.a"],
     "shipping": ["1.A.3.d", "1.D.1.b"],
     "steel": ["1.A.2.a", "2.C.1"],
-    # paper, food, glass and ceramics combustion, glass, ceramics
-    "industry_heat": ["1.A.2.d", "1.A.2.e", "1.A.2.f", "2.A.3", "2.A.4"],
-    # is "1.A.2.f, "2.A.3", "2.A.4" double counted? Does this also mean that cement already included glass and ceramics? I think definition above is wrong (human verified problem)
-    # Two related issues (claude, to be verified):
-    # • The budget adds 100 % of 1.A.2.e (food) and 1.A.2.d (pulp, paper, print), but the model covers only about 57 % of JRC-IDEES food thermal energy.
-    # • UK glass and ceramic combustion is missing; only DESNZ process rows are added.
+    # glass and ceramics combustion and processes are already part of 1.A.2.f
+    # and 2.A of cement
+    "paper": ["1.A.2.d"],
+    "food": ["1.A.2.e"],
 }
 # the chemical industry categories cover methanol and ammonia together
 CHEMICALS_CODES = ["1.A.2.c", "2.B"]
@@ -197,6 +195,9 @@ class EEAGreenhouseGasInventory(Dataset[pd.DataFrame]):
     def get_sector_codes(self, sectors: list[str]) -> list[str]:
         """The UNFCCC sector codes covered by the modeled sectors.
 
+        A code shared by several sectors is returned once, so that its
+        emissions are not counted twice.
+
         Args:
             sectors (list[str]): Modeled sectors, as in the model settings.
         """
@@ -211,7 +212,7 @@ class EEAGreenhouseGasInventory(Dataset[pd.DataFrame]):
                 f"Both {CHEMICALS_SECTORS} must be modeled to include the "
                 "chemical industry emissions, but only one is selected."
             )
-        return codes
+        return list(dict.fromkeys(codes))
 
     def get_emissions_sectors(
         self,
@@ -309,6 +310,8 @@ class EEAGreenhouseGasInventory(Dataset[pd.DataFrame]):
         Nodes without an inventory, such as the UK since it left the EU, are
         skipped. Sector and node combinations that are not reported are NaN.
         """
+        if len(set(codes)) != len(codes):
+            raise ValueError(f"The sector codes {codes} hold duplicates.")
         reported_codes = self.data.index.get_level_values(0)
         missing = [code for code in codes if code not in reported_codes]
         if missing:

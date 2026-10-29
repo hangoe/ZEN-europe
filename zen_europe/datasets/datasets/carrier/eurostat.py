@@ -110,15 +110,14 @@ _HEAT_DH_NRG_BAL = {
     "GHP": "Gross heat production",
 }
 
-# fuels of the gross heat production that set the industrial boiler fuel mix,
-# mapped to the boiler fuels
-_HEAT_INDUSTRY_SIEC = {
-    "G3000": "natural_gas", # Natural gas
+# final consumption of the paper industry, which sets the waste share of the
+# JRC-IDEES "Biomass and waste" carrier in paper boilers
+_PAPER_NRG_BAL = {
+    "FC_IND_PPP_E": "Final consumption - industry sector - paper, pulp and printing",
+}
+_PAPER_BIOMASS_WASTE_SIEC = {
     "R5110-5150_W6000RI": "biomass", # Primary solid biofuels
     "R5300": "biomass", # Biogases
-    "E7000": "electricity", # Electricity
-    "O4000XBIO": "oil", # Oil and petroleum products (excluding biofuel portion)
-    "C0000X0350-0370": "coal", # Solid fossil fuels
     "W6100": "waste", # Industrial waste (non-renewable)
     "W6210": "waste", # Renewable municipal waste
     "W6220": "waste", # Non-renewable municipal waste
@@ -430,10 +429,10 @@ class Eurostat(Dataset[pd.DataFrame]):
         return self._query_heat_dh_technology()
 
     @instance_cache
-    def get_heat_production_industry(self, year: int) -> pd.DataFrame:
-        """Gross heat production (GWh) per node and boiler fuel, at the latest
-        available year up to `year`."""
-        return self._query_heat_production_industry(year)
+    def get_paper_waste_share(self, year: int) -> pd.Series:
+        """Waste share of the paper industry's biomass and waste consumption per
+        node, at the latest available year up to `year`."""
+        return self._query_paper_waste_share(year)
 
     @instance_cache
     def get_coal_availability(self) -> pd.DataFrame:
@@ -584,23 +583,21 @@ class Eurostat(Dataset[pd.DataFrame]):
         heat_data = heat_data.swaplevel(0, 1).sort_index()
         return heat_data / Constants.GJ_PER_MWH  # convert from TJ to GWh
 
-    def _query_heat_production_industry(self, year: int) -> pd.DataFrame:
-        """Load the gross heat production per fuel, which sets the fuel mix of
-        the industrial boilers. Biomass and biogas, and the three waste fuels
-        are summed."""
+    def _query_paper_waste_share(self, year: int) -> pd.Series:
+        """Load the final consumption of biomass and waste in the paper industry
+        and return waste / (biomass + waste); NaN where neither is consumed."""
         data = self._query_siec_data(
-            nrg_bal=_HEAT_DH_NRG_BAL,
-            siec=_HEAT_INDUSTRY_SIEC,
+            nrg_bal=_PAPER_NRG_BAL,
+            siec=_PAPER_BIOMASS_WASTE_SIEC,
             start_period=_EUROSTAT_START_YEAR,
         )
         data = self._convert_availability(data, {}, cutoff_year=year)
-        data = data.droplevel("nrg_bal").astype(float)
-        for node, siec in data.stack(future_stack=True)[lambda s: s.isna()].index:
-            logger.warning(f"No {siec} heat production for {node}; set to 0.")
-        data = data.T.groupby(_HEAT_INDUSTRY_SIEC).sum().T
-        data.index.name = "node"
-        data.columns.name = None
-        return data
+        data = data.droplevel("nrg_bal").astype(float).fillna(0.0)
+        data = data.T.groupby(_PAPER_BIOMASS_WASTE_SIEC).sum().T
+        total = data.sum(axis=1)
+        share = data.get("waste", 0.0) / total.where(total > 0)
+        share.index.name = "node"
+        return share.rename("waste_share")
 
     def _query_coal_availability(self) -> pd.DataFrame:
         """Calculate coal availability, scaled from imports and production

@@ -113,7 +113,7 @@ class DSMLiteratureReview(Dataset[dict[str, pd.DataFrame]]):
         return cost / ENERGY_CONTENT[element.carrier]
 
     def _get_category(self, element: IndustryDSM) -> int:
-        shiftability = element.settings.industry.dsm_shiftability
+        shiftability = element.settings.industry_flexibility.dsm_shiftability
         return int(self.data["categories"].at[element.carrier, shiftability])
 
     def _get_parameters(self, element: IndustryDSM) -> dict[str, float]:
@@ -124,14 +124,14 @@ class DSMLiteratureReview(Dataset[dict[str, pd.DataFrame]]):
         }
 
     def _source(self, element: IndustryDSM) -> AssumptionInformation:
-        shiftability = element.settings.industry.dsm_shiftability
+        shiftability = element.settings.industry_flexibility.dsm_shiftability
         category = self._get_category(element)
         reference = self.data["categories"].at[element.carrier, "reference"]
         return AssumptionInformation(
             description=(
                 f"{element.carrier}: demand-shiftability category {category} "
-                f"({shiftability}, setting industry.dsm_shiftability), from a "
-                f"literature review: {reference}. The storage cost, "
+                f"({shiftability}, setting industry_flexibility.dsm_shiftability), "
+                f"from a literature review: {reference}. The storage cost, "
                 "variable cost and shifting horizon of the category are own "
                 "assumptions, see docs, 'Demand-side management'."
             ),
