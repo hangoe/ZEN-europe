@@ -46,6 +46,8 @@ SECTOR_CODES = {
     # glass and ceramics combustion and processes are already part of 1.A.2.f
     # and 2.A of cement
     "paper": ["1.A.2.d"],
+    # all of 1.A.2.e, although the modeled food sub-processes cover only about
+    # 58 % of the JRC-IDEES food thermal energy, so the budget is slightly generous
     "food": ["1.A.2.e"],
 }
 # the chemical industry categories cover methanol and ammonia together

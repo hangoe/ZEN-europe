@@ -234,9 +234,11 @@ class IndustryProductionData(DatasetCollection):
                 description=(
                     "The existing production capacity is the JRC-IDEES installed "
                     "capacity (glass, paper) at 8760 hours per year; for ceramic, "
-                    "food and the paper nodes without JRC-IDEES data it equals the "
-                    "product demand (see demand). It is assumed to be built evenly "
-                    "over the lifetime of the technology."
+                    "food and the paper nodes without JRC-IDEES data it is the "
+                    "product demand (see demand) divided by an assumed capacity "
+                    f"utilisation of {self._assumptions.get_value('capacity_utilisation')} "
+                    "(general industry assumptions). It is assumed to be built "
+                    "evenly over the lifetime of the technology."
                 ),
                 metadata=self.metadata,
             ),
@@ -445,11 +447,11 @@ class IndustryProductionData(DatasetCollection):
 
     @cache
     def _calculate_capacity(self, nodes: tuple[str, ...]) -> pd.DataFrame:
-        """Installed production capacity (t/h) per node and sector; equal to the
-        production where no capacity data exist."""
+        """Installed production capacity (t/h) per node and sector; the production
+        divided by the capacity utilisation where no capacity data exist."""
         idees = cast(JRCIDEES, self.data["jrc_idees"])
         production = self._calculate_production(nodes)
-        capacity = production.copy()
+        capacity = production / self._assumptions.get_value("capacity_utilisation")
         capacity["glass"] = (
             self._fill_proxy_nodes(
                 self._reindex_nodes(
@@ -469,7 +471,10 @@ class IndustryProductionData(DatasetCollection):
         # paper: the nodes without JRC-IDEES (JRC BAT consumption)
         jrc_bat = cast(JRCBATPaper, self.data["jrc_bat_paper"])
         bat_nodes = jrc_bat.get_consumption().index
-        capacity.loc[bat_nodes, "paper"] = production.loc[bat_nodes, "paper"]
+        capacity.loc[bat_nodes, "paper"] = (
+            production.loc[bat_nodes, "paper"]
+            / self._assumptions.get_value("capacity_utilisation")
+        )
         return capacity
 
     @cache
@@ -603,6 +608,9 @@ class IndustryProductionData(DatasetCollection):
                 "paper", rehfeldt.get_activity_weights("paper")
             ),
         }
+        # only the paper capex is taken from the literature; the O&M costs and the
+        # lifetime stay those of the JRC-EU-TIMES integrated mill. Paper has no
+        # competing production route, so this only offsets the costs linearly.
         # Euro/(t/a) -> Euro/(t/h)
         costs["paper"]["capex"] = round(
             self._literature_cost("paper", "capex") * hours, 2

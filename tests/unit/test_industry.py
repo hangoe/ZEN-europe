@@ -121,15 +121,23 @@ def test_demand_is_physical_output(production: IndustryProductionData) -> None:
 
 
 def test_capacity_existing_has_headroom(production: IndustryProductionData) -> None:
-    """Glass and paper plants have installed capacity above today's production."""
+    """Glass and paper plants have installed capacity above today's production; the
+    other sectors and nodes have the assumed capacity utilisation."""
     capacity = production._calculate_capacity(NODES)
     for sector in ("glass", "paper"):
         demand = production.calculate_demand(sector, NODES)
         assert (capacity[sector] >= demand - 1e-9).all()
         assert 1.1 < capacity[sector].sum() / demand.sum() < 1.4
-    for sector in ("ceramic", "food"):
-        assert capacity[sector].equals(
-            production.calculate_demand(sector, NODES).rename(sector)
+    utilisation = production._assumptions.get_value("capacity_utilisation")
+    bat_nodes = list(JRCBATPaper(RAW_DATA_PATH).get_consumption().index)
+    for sector, nodes in [
+        ("ceramic", list(NODES)),
+        ("food", list(NODES)),
+        ("paper", bat_nodes),
+    ]:
+        demand = production.calculate_demand(sector, NODES)[nodes]
+        assert capacity.loc[nodes, sector].to_numpy() == pytest.approx(
+            (demand / utilisation).to_numpy()
         )
 
 

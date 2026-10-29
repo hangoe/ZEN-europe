@@ -6,6 +6,10 @@ import pandas as pd
 from zen_creator import Dataset
 from zen_creator.datasets.datasets.metadata import MetaData
 
+from zen_europe.datasets.datasets.energy_system.desnz_ghg_inventory import (
+    CHEMICALS_SECTORS,
+)
+
 # Emissions are reported in kt, the carbon budget is accounted in Gt.
 _KT_PER_GT = 1e6
 # ZEN-europe sector of each ONS industry
@@ -56,6 +60,13 @@ class ONSIndustryEmissions(Dataset[pd.DataFrame]):
         return data
 
     def get_emissions_sectors(self, sectors: list[str]) -> pd.DataFrame:
-        """Emissions in Gt of the modeled sectors among `paper` and `food`."""
+        """Emissions in Gt of the modeled sectors among `paper` and `food`.
+
+        If the chemicals sectors are modeled, no rows are returned: the paper and
+        food combustion is already part of the DESNZ "Other industrial combustion"
+        of the chemicals sectors, so it would be counted twice.
+        """
+        if all(sector in sectors for sector in CHEMICALS_SECTORS):
+            return self.data.iloc[:0] / _KT_PER_GT
         rows = [row for sector, row in _SECTOR_ROWS.items() if sector in sectors]
         return self.data.loc[rows] / _KT_PER_GT

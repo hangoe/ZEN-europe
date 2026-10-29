@@ -66,21 +66,22 @@ production, energy and heat statistics is `DATA_YEAR` (2023) in
 Demand (t/h) = annual physical production ÷ 8760 h, flat over the year. Net trade is not
 modeled. Existing boilers, the cascade, the waste heat limit and the kiln fuel are all
 based on this demand. Existing production capacity (t/h) = installed capacity ÷ 8760 h
-where JRC-IDEES reports it (glass, paper: about 20–25 % headroom above demand) and equals
-the demand otherwise.
+where JRC-IDEES reports it (glass, paper: about 26–29 % headroom above demand) and demand ÷
+`capacity_utilisation` (0.8, from the glass and paper ratio, 25 % headroom) otherwise, so
+DSM can use existing plants.
 
 | sector | demand basis | existing capacity basis |
 |---|---|---|
 | glass, paper | JRC-IDEES-2023 physical output | JRC-IDEES-2023 installed capacity |
-| ceramic | JRC-IDEES thermal final energy ÷ Rehfeldt weighted fuel intensity | = demand |
-| food | Rehfeldt EU28+3 activity per sub-process, distributed to nodes by FAOSTAT production of a proxy item (`FOOD_ITEMS`) | = demand |
+| ceramic | JRC-IDEES thermal final energy ÷ Rehfeldt weighted fuel intensity | demand ÷ 0.8 |
+| food | Rehfeldt EU28+3 activity per sub-process, distributed to nodes by FAOSTAT production of a proxy item (`FOOD_ITEMS`) | demand ÷ 0.8 |
 
 **Nodes without JRC-IDEES** (CH, NO, UK; `NODES_WITHOUT_IDEES`):
 
 - glass, ceramic: CH = AT, NO = FI, UK = DE × population UK/DE in `DATA_YEAR`
   (World Bank, `WorldBankPopulation`);
 - paper: 2008 *consumption* from JRC BAT Paper (2015), Table 1.2 (CH 1,397, NO 831,
-  UK 11,443 kt), used for both demand and existing capacity. No existing boilers at these nodes;
+  UK 11,443 kt), used as demand; existing capacity = demand ÷ 0.8. No existing boilers at these nodes;
 - food: FAOSTAT covers all nodes.
 
 **Vintages**: existing capacity is today's capacity in `reference_year - 1`, spread over
@@ -155,6 +156,8 @@ The literature costs of paper and food are in
 - Sub-processes paper, recovered fibres, chemical pulp (95.2 % of activity; weights
   56.1/28.9/15.0 %). Mechanical pulp excluded.
 - Capex override: JRC (~2,283 EUR/(t/yr)) describes an integrated greenfield mill.
+  Only the capex is overridden; O&M and lifetime stay JRC (integrated mill). Paper has no
+  competing production route, so this only shifts the costs linearly.
   700 EUR/(t/yr) is a lower bound from brownfield conversions: Stora Enso Oulu 2026
   (~1,333), Langerbrugge 2022 (~571), Kotkamills BM2 2016 (~425–450 EUR/(t/yr)).
 - Lime kiln calcination of kraft pulping is not included.
@@ -285,7 +288,7 @@ sector's JRC-IDEES fuel mix in the country (EU27 for NO/UK).
   waste 7.1 %, coal 2.2 %), for all sectors;
 - no existing electrode boilers.
 
-**Cut-off**: node totals below `min_boiler_capacity` are set to 0 (removes 146 of 413
+**Cut-off**: node totals below `min_boiler_capacity` are set to 0 (removes 149 of 413
 non-zero entries, 0.8 % of capacity). Capacity can still be built.
 
 ## Waste heat limit
@@ -296,19 +299,19 @@ distributed over bands by heat demand:
     capacity_limit[s, band, n] = production[s, n] × fuel_intensity_>200°C[s] × heat[s, band] / Σ heat[s, :]
 
 The limit is applied to heat pump output; the physical bound (× COP/(COP − 1)) is
-1.17–2.26× larger. EU totals (GW, glass/ceramic/paper/food): 0–100 °C
-0.48/6.57/0.02/0.67; 100–150 °C 1.56/1.92/0.43/0.22; 150–200 °C 3.12/3.84/0.27/0.24.
+1.17–2.26× larger. Totals over all nodes (GW, glass/ceramic/paper/food): 0–100 °C
+0.48/6.55/0.02/0.61; 100–150 °C 1.56/1.91/0.48/0.20; 150–200 °C 3.11/3.83/0.30/0.22.
 
 Validation against Heat Roadmap Europe (Mathiesen et al.), 2015, non-metallic minerals +
 paper:
 
 | node | model (GW) | HRE (GW) | ratio |
 |---|---|---|---|
-| DE | 3.45 | 3.87 | 0.89 |
-| FR | 1.82 | 2.42 | 0.75 |
-| HU | 0.18 | 0.26 | 0.68 |
-| PL | 1.36 | 1.58 | 0.86 |
-| ES | 2.10 | 2.38 | 0.88 |
+| DE | 3.24 | 3.87 | 0.84 |
+| FR | 1.67 | 2.42 | 0.69 |
+| HU | 0.16 | 0.26 | 0.62 |
+| PL | 1.24 | 1.58 | 0.78 |
+| ES | 2.00 | 2.38 | 0.84 |
 
 ## Diffusion
 
@@ -393,20 +396,27 @@ in `dsm_category_parameters.csv` (internal assumptions):
 
 Budget per Mannhardt (2026): IPCC AR6 remaining budget, per-capita share, scaled to the
 emission share of modeled sectors. With `glass`, `ceramic`, `paper` and `food`, these sectors are added to
-the modeled sectors (2022 limit: ~+2.3 %).
+the modeled sectors (2022 limit: ~+1.9 %).
 
 | region | source | categories |
 |---|---|---|
 | EU | EEA/UNFCCC CRF (`eea_ghg_inventory.py`) | `1.A.2.d` paper, `1.A.2.e` food |
 | UK glass, ceramic | DESNZ (`desnz_ghg_inventory.py`) | "Glass production", "Bricks production", "Other ceramics" |
-| UK paper, food | ONS (2026) (`ons_industry_emissions.py`) | SIC 17; SIC 10–12 |
+| UK paper, food | ONS (2026) (`ons_industry_emissions.py`), only without `ammonia` and `methanol` | SIC 17; SIC 10–12 |
 
 EU glass and ceramic combustion and process emissions are not added here. They are already
 part of the `cement` budget, which takes all of `1.A.2.f` (non-metallic minerals combustion)
 and `2.A` (mineral industry). The base model therefore overestimates the cement-sector
 emissions: it also counts glass, ceramics, lime and other non-metallic minerals, roughly
-50 Mt CO2 in 2022 for glass and ceramics alone. Hence the budget increase is only ~2.3 %.
+50 Mt CO2 in 2022 for glass and ceramics alone. Hence the budget increase is only ~1.9 %.
 Each UNFCCC code is counted once (`get_sector_codes`).
+
+In the UK, the combustion of paper, food, glass and ceramics is part of the DESNZ "Other
+industrial combustion", which the budget takes with the chemicals sectors (`ammonia`,
+`methanol`). The ONS paper and food emissions are therefore only added if these are not
+modeled. The EU budget takes all of `1.A.2.e`, although the modeled food sub-processes
+cover only about 58 % of the JRC-IDEES food thermal energy (≈406 of 695 PJ), so the food
+budget is slightly generous.
 
 ## References
 

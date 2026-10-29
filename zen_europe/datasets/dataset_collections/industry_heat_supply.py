@@ -375,7 +375,7 @@ class IndustryHeatSupply(DatasetCollection):
         """Boiler capacity (GW) per sector and node (rows) and fuel (columns): the
         sector's heat demand split by its fuel mix."""
         production = self._production_data
-        # production capacity basis, as the heat carriers
+        # product demand basis, as the heat carriers
         demand = pd.concat(
             {
                 sector: production.calculate_demand(sector, nodes)

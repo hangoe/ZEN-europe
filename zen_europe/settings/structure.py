@@ -40,9 +40,12 @@ class StructureSettings(SettingsCategory):
             "steel",
             "passenger_transport",
             "truck_transport",
+            "glass",
+            "ceramic",
+            "paper",
+            "food",
         ]
     )
-    # TODO: add here the respective sectors
 
     set_conversion_technologies: list[str] = Field(default_factory=list)
     set_storage_technologies: list[str] = Field(default_factory=list)
