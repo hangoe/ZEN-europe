@@ -276,4 +276,4 @@ def test_tes_self_discharge_brown2018() -> None:
     assert Brown2018.hourly_self_discharge(20 / 24) == pytest.approx(0.0488, rel=1e-3)
 
 
-# This can probably be removed -> Check with Christoph
+# TODO: this can probably be removed -> check with Christoph

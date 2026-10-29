@@ -131,4 +131,4 @@ class CeramicPostComb(IndustryPostComb, RetrofittingTechnology):
     name: str = "ceramic_post_comb"
     sector: ClassVar[str] = "ceramic"
 
-# This should be one module per technology
+# TODO: one module per technology (TBD with Christoph and Jacob)

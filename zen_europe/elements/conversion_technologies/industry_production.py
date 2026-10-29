@@ -103,4 +103,4 @@ class FoodProduction(IndustryProduction, ConversionTechnology):
     sector: ClassVar[str] = "food"
 
 
-# One module per production
+# TODO: one module per production (TBD with Christoph and Jacob)

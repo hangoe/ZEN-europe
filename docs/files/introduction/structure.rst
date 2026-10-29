@@ -68,16 +68,6 @@ freight mileage, steel, cement, ammonia, methanol, olefins, fuels for aviation
 and shipping). The model decides on the investment in and operation of all
 technologies that supply these demands.
 
-The sectors ``glass``, ``ceramic``, ``paper`` and ``food`` add the production
-of these products together with their process heat supply, thermal energy
-storage and demand-side management. Thermal energy storage, demand-side
-management of all industrial products and the temperature bands with heat
-pumps are switched by the ``industry_flexibility`` settings (see
-:doc:`../user_guide/industry`).
-
-..
-  If you change the sector definition -> Remove this and show in sector definition.
-
 System-wide constraints and assumptions are set by the energy system class
 ``energy_system_nuts0``:
 
@@ -97,6 +87,13 @@ Elements are grouped into sectors. A sector lists the technologies and carriers
 that belong to it and the sectors it cannot exist without. The default
 dataset includes all sectors. They are listed, with their technologies,
 carriers and carrier flows, in :ref:`model_structure.index`.
+
+The sectors ``glass``, ``ceramic``, ``paper`` and ``food`` contain the
+production of these products together with their process heat supply, thermal
+energy storage and demand-side management. Thermal energy storage, demand-side
+management of all industrial products and the temperature bands with heat
+pumps are switched by the ``industry_flexibility`` settings (see
+:doc:`../user_guide/industry`).
 
 Some technologies connect two sectors. They are declared by every sector they
 belong to and are only part of the model when all of these sectors are

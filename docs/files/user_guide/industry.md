@@ -1,8 +1,5 @@
 # Industry heat sectors
 
-..
-    For now, this is great to have, but lets not have it in the final PR
-
 Sectors `glass`, `ceramic`, `paper` and `food` (`zen_europe/elements/sectors/`).
 Input data are computed in `IndustryProductionData` (`industry_production_data.py`) and
 `IndustryHeatSupply` (`industry_heat_supply.py`) in `zen_europe/datasets/dataset_collections/`.
@@ -56,8 +53,8 @@ production, energy and heat statistics is `DATA_YEAR` (2023) in
 
 | scenario | change |
 |---|---|
-| base: four sectors, full flexibility (TES and DSM) | `zen_europe_base` |
-| original ZEN-europe (no industrial heat, TES or DSM) | `zen_europe_no_industry_heat`: removes the four sectors, `use_tes: false`, `dsm_shiftability: none` |
+| default: four sectors, full flexibility (TES and DSM) | `zen_europe` |
+| original ZEN-europe (no industrial heat, TES or DSM) | `zen_europe_legacy`: removes the four sectors, `use_tes: false`, `dsm_shiftability: none` |
 | no flexibility | `use_tes: false`, `dsm_shiftability: none` |
 | TES only / DSM only | `dsm_shiftability: none` / `use_tes: false` |
 | no diffusion | no flexibility with `investment.use_diffusion_rates: false` |

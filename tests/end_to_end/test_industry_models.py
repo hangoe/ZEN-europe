@@ -19,7 +19,7 @@ def _create(name: str) -> Model:
 
 @pytest.fixture(scope="module")
 def full() -> Model:
-    return _create("zen_europe_base")
+    return _create("zen_europe")
 
 
 def _is_flexibility(name: str) -> bool:
@@ -51,7 +51,7 @@ def test_elements_per_sector(full: Model) -> None:
 
 
 def test_no_industry_heat() -> None:
-    model = _create("zen_europe_no_industry_heat")
+    model = _create("zen_europe_legacy")
     assert not any(
         any(sector in n for sector in SECTORS) or _is_flexibility(n)
         for n in model.elements
@@ -59,7 +59,7 @@ def test_no_industry_heat() -> None:
 
 
 def test_no_flexibility_and_no_diffusion() -> None:
-    model = _create("zen_europe_ind_heat_no_flexibility_nodiffusion")
+    model = _create("zen_europe_no_flex_no_diffusion")
     assert "glass_production" in model.elements
     assert not any(_is_flexibility(n) for n in model.elements)
     heat_pump = model.elements["heat_pump_industry_150_200_water_paper"]
@@ -67,16 +67,16 @@ def test_no_flexibility_and_no_diffusion() -> None:
 
 
 def test_tes_only_and_dsm_only() -> None:
-    tes_only = set(_create("zen_europe_ind_heat_TES_only").elements)
+    tes_only = set(_create("zen_europe_no_dsm").elements)
     assert "industry_TES_steam_150_200_glass" in tes_only
     assert not any(n.endswith("_DSM") for n in tes_only)
-    dsm_only = set(_create("zen_europe_ind_heat_DSM_only").elements)
+    dsm_only = set(_create("zen_europe_no_tes").elements)
     assert {"glass_DSM", "ammonia_DSM"} <= dsm_only
     assert not any("TES" in n for n in dsm_only)
 
 
 def test_single_temperature_level() -> None:
-    model = _create("zen_europe_ind_heat_single_temp")
+    model = _create("zen_europe_single_temp")
     names = set(model.elements)
     assert "heat_pump_industry_150_200_water_glass" in names
     assert "heat_pump_industry_0_100_water_glass" not in names
@@ -86,12 +86,12 @@ def test_single_temperature_level() -> None:
 def test_write(tmp_path: Path) -> None:
     create_model(
         models=DATA_PATH / "models.yaml",
-        model_name="zen_europe_ind_heat_no_flexibility",
+        model_name="zen_europe_no_flex",
         output_folder=tmp_path,
     )
     boiler = (
         tmp_path
-        / "zen_europe_ind_heat_no_flexibility"
+        / "zen_europe_no_flex"
         / "set_technologies"
         / "set_conversion_technologies"
         / "natural_gas_boiler_industry_glass"
