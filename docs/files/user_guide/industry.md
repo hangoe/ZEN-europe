@@ -1,5 +1,8 @@
 # Industry heat sectors
 
+*Note: this documentation page is not intended for the PR on ZEN-universe; it is
+included for the completeness of the submission.*
+
 Sectors `glass`, `ceramic`, `paper` and `food` (`zen_europe/elements/sectors/`).
 Input data are computed in `IndustryProductionData` (`industry_production_data.py`) and
 `IndustryHeatSupply` (`industry_heat_supply.py`) in `zen_europe/datasets/dataset_collections/`.
@@ -15,11 +18,9 @@ Input data are computed in `IndustryProductionData` (`industry_production_data.p
   of the production technology.
 - **Per-sector heat chain**: each sector holds its own boilers, heat pumps, cascade, kiln
   fuel, TES and DSM (`<name>_<sector>`), so heat cannot be exchanged between sectors.
-- **Default dataset**: the four sectors are not part of the default
-  `structure.set_sectors` in `zen_europe/settings/structure.py`; they are added in the
-  defaults of `data/models.yaml`. The generated model-structure pages and the statement in
-  the model structure overview that the default dataset includes all sectors therefore
-  cover only the default sectors.
+- **Default dataset**: the four sectors are part of the default `structure.set_sectors`
+  in `zen_europe/settings/structure.py`; the `zen_europe_legacy` model in
+  `data/models.yaml` removes them.
 - **Sector links**: `glass` and `ceramic` require `electricity`, `gas`, `hydrogen` (kiln
   fuel) and `district_heating`; `paper` and `food` require `electricity`, `gas` and
   `district_heating`. `glass_post_comb` and `ceramic_post_comb` are also declared by
@@ -176,16 +177,16 @@ The literature costs of paper and food are in
 
 ## Kiln fuel switching
 
-The > 200 °C natural gas of glass and ceramic is routed through `fuel_to_kiln_<sector>`,
-supplied by `natural_gas_to_kilnfuel`, `hydrogen_to_kilnfuel` and
-`electricity_to_kilnfuel`. These model fuel choice only and have no costs: the weighted AIDRES
+The > 200 °C natural gas of glass and ceramic is routed through `kiln_fuel_<sector>`,
+supplied by `natural_gas_to_kiln_fuel`, `hydrogen_to_kiln_fuel` and
+`electricity_to_kiln_fuel`. These model fuel choice only and have no costs: the weighted AIDRES
 capex difference to the natural gas route is +1.5 EUR/t (H2) and −3.6 EUR/t (electricity).
 This is optimistic (new furnace, shorter campaigns, size limits). Lifetime of the
 `cement_kiln` (as `*_to_cement_fuel`). Coal, biomass and oil shares remain fixed inputs.
 
 - **Switchable share** (`kiln_switchable_share` in the general assumptions): glass 100 %, ceramic 97.4 %; the
   remainder is a fixed `natural_gas` input.
-- **Existing capacity**: `natural_gas_to_kilnfuel` at today's kiln gas flow, with
+- **Existing capacity**: `natural_gas_to_kiln_fuel` at today's kiln gas flow, with
   capacity limit (see [Diffusion](#diffusion)). Alternatives start at 0 with the
   Mannhardt `MEDIUM` diffusion rate.
 - **Conversion factors** (`KILN_FUEL_INPUT`, `aidres.py`): AIDRES route fuel use
@@ -331,7 +332,7 @@ alternative kiln fuels that of `hydrogen_to_cement_fuel`, post-combustion captur
 - **First-year heat pump cap** (`capacity_limit`): in the reference year, at most
   `hp_share_first_year` (2 %) of the band demand per node, split by heat source (no
   industrial heat pumps today). Without it, term (2) alone allows ~8 % of the demand.
-- **Pass-through technologies** (cascade, `natural_gas_to_kilnfuel`) share the reference
+- **Pass-through technologies** (cascade, `natural_gas_to_kiln_fuel`) share the reference
   carrier with heat pumps and alternative kiln fuels. Without capex or limit, their
   capacity would inflate term (2), so they get existing capacity and `capacity_limit` =
   flat demand × `capacity_limit_margin` (2.0, ~10 % above the max. peak-to-mean ratio of

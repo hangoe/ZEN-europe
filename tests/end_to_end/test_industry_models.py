@@ -40,7 +40,7 @@ def test_elements_per_sector(full: Model) -> None:
         )
         assert sum(n.endswith(f"_boiler_industry_{sector}") for n in names) == 6
         assert {f"industry_TES_steam_150_200_{sector}", f"{sector}_DSM"} <= names
-        has_kiln = f"natural_gas_to_kilnfuel_{sector}" in names
+        has_kiln = f"natural_gas_to_kiln_fuel_{sector}" in names
         assert has_kiln == (sector in ("glass", "ceramic"))
     assert {
         "glass_post_comb",
@@ -119,7 +119,7 @@ def test_glass_without_carbon_and_cement(tmp_path: Path) -> None:
             tmp_path, "electricity, gas, heat, district_heating, hydrogen, glass"
         ).elements
     )
-    assert {"glass_production", "natural_gas_to_kilnfuel_glass", "glass_DSM"} <= names
+    assert {"glass_production", "natural_gas_to_kiln_fuel_glass", "glass_DSM"} <= names
     assert not any(n.endswith("_post_comb") for n in names)
     assert not any("ceramic" in n or "paper" in n for n in names)
 

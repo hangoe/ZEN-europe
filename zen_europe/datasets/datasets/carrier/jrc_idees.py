@@ -17,6 +17,7 @@ from zen_creator.datasets.datasets.metadata import MetaData
 
 from zen_europe.settings.cache import get_active_cache_settings
 from zen_europe.utils.constants import Constants
+from zen_europe.utils.industry import IDEES_EU
 
 logger = logging.getLogger(__name__)
 
@@ -65,12 +66,12 @@ _JRC_IDEES_TES_ROWS = {
 }
 _KTOE2GWH = 1 / Constants.TOE_PER_MWH  # ktoe (useful energy) -> GWh
 
-# ----- industry workbooks (glass, ceramic, paper and food sectors) -----
-# regions of the industry data: the EU27 aggregate and the member states that
-# are model nodes (Cyprus and Malta are not)
+# regions of the industry workbooks (glass, ceramic, paper and food sectors): the
+# EU27 aggregate and the member states that are model nodes (Cyprus and Malta are
+# not)
 _JRC_IDEES_INDUSTRY_REGIONS = sorted(
     [country for country in _JRC_IDEES_COUNTRIES if country not in ("CY", "MT")]
-    + ["EU27"]
+    + [IDEES_EU]
 )
 _JRC_IDEES_INDUSTRY_SHEETS = ["NMM", "PPA", "NMM_fec", "PPA_fec", "FBT_fec"]
 # the year columns of the first block of each sheet
@@ -161,6 +162,7 @@ _JRC_IDEES_FUEL_MAPPINGS = {
         "Biomass and waste": "biomass_and_waste",
     },
 }
+
 
 class JRCIDEES(Dataset[pd.DataFrame]):
     """
@@ -320,10 +322,12 @@ class JRCIDEES(Dataset[pd.DataFrame]):
             sheets = self._download_industry_sheets(region)
             for sector, (sheet, parent_rows) in _JRC_IDEES_THERMAL_ROWS.items():
                 thermal[(region, sector)] = self._extract_thermal(
-                    sheets[sheet], parent_rows)
+                    sheets[sheet], parent_rows
+                )
             for sector, (sheet, rows) in _JRC_IDEES_CAPACITY_ROWS.items():
                 production[(region, sector)] = self._extract_production(
-                    sheets[sheet], rows)
+                    sheets[sheet], rows
+                )
         data = {
             "thermal": pd.concat(thermal, names=index_names["thermal"]),
             "production": pd.concat(production, names=index_names["production"]),
@@ -340,7 +344,10 @@ class JRCIDEES(Dataset[pd.DataFrame]):
         if self.source_path is None:
             raise ValueError("source_path must be set to cache JRC-IDEES data.")
         return (
-            self.source_path / "02-carrier" / "industry" / "jrc_idees"
+            self.source_path
+            / "02-carrier"
+            / "industry"
+            / "jrc_idees"
             / f"industry_{name}.feather"
         )
 
@@ -354,14 +361,15 @@ class JRCIDEES(Dataset[pd.DataFrame]):
         with zipfile.ZipFile(BytesIO(response.content)) as archive:
             with archive.open(f"JRC-IDEES-2023_Industry_{region}.xlsx") as file:
                 sheets = pd.read_excel(
-                    file, sheet_name=_JRC_IDEES_INDUSTRY_SHEETS, header=None)
+                    file, sheet_name=_JRC_IDEES_INDUSTRY_SHEETS, header=None
+                )
         return {sheet: self._extract_years(df) for sheet, df in sheets.items()}
 
     @staticmethod
     def _extract_years(sheet: pd.DataFrame) -> pd.DataFrame:
         """Return the first block of year columns, with the row labels as index."""
         first, last = _JRC_IDEES_INDUSTRY_FIRST_YEAR, _JRC_IDEES_INDUSTRY_LAST_YEAR
-        data = sheet.iloc[:, 1:last - first + 2]
+        data = sheet.iloc[:, 1 : last - first + 2]
         data.columns = range(first, last + 1)
         data.index = sheet[0]
         return data
@@ -393,8 +401,12 @@ class JRCIDEES(Dataset[pd.DataFrame]):
             start = labels.index(header) + 1
             # a section ends at the next "(kt production)" header
             end = next(
-                (i for i in range(start, len(labels))
-                 if isinstance(labels[i], str) and labels[i].endswith("(kt production)")),
+                (
+                    i
+                    for i in range(start, len(labels))
+                    if isinstance(labels[i], str)
+                    and labels[i].endswith("(kt production)")
+                ),
                 len(labels),
             )
             section = sheet.iloc[start:end]
@@ -463,9 +475,11 @@ class JRCIDEES(Dataset[pd.DataFrame]):
     def get_industry_installed_capacity(self, sector: str, year: int) -> pd.Series:
         """Installed production capacity (kt) of an industry sector per node."""
         return self._industry["production"].xs(
-            (sector, "installed_capacity"), level=["sector", "quantity"])[year]
+            (sector, "installed_capacity"), level=["sector", "quantity"]
+        )[year]
 
     def get_industry_physical_output(self, sector: str, year: int) -> pd.Series:
         """Physical production output (kt) of an industry sector per node."""
         return self._industry["production"].xs(
-            (sector, "physical_output"), level=["sector", "quantity"])[year]
+            (sector, "physical_output"), level=["sector", "quantity"]
+        )[year]

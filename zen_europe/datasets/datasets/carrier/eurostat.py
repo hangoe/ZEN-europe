@@ -116,11 +116,11 @@ _PAPER_NRG_BAL = {
     "FC_IND_PPP_E": "Final consumption - industry sector - paper, pulp and printing",
 }
 _PAPER_BIOMASS_WASTE_SIEC = {
-    "R5110-5150_W6000RI": "biomass", # Primary solid biofuels
-    "R5300": "biomass", # Biogases
-    "W6100": "waste", # Industrial waste (non-renewable)
-    "W6210": "waste", # Renewable municipal waste
-    "W6220": "waste", # Non-renewable municipal waste
+    "R5110-5150_W6000RI": "biomass",  # Primary solid biofuels
+    "R5300": "biomass",  # Biogases
+    "W6100": "waste",  # Industrial waste (non-renewable)
+    "W6210": "waste",  # Renewable municipal waste
+    "W6220": "waste",  # Non-renewable municipal waste
 }
 
 _COAL_SIEC = {"C0220": "lignite", "C0129": "hard_coal"}

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from functools import cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -14,8 +13,6 @@ from zen_creator.datasets.datasets.metadata import (
 )
 
 from zen_europe.datasets.dataset_collections.industry_production_data import (
-    IDEES_EU,
-    NODES_WITHOUT_IDEES,
     IndustryProductionData,
 )
 from zen_europe.datasets.dataset_collections.technology_cost_database import (
@@ -32,11 +29,14 @@ from zen_europe.utils.industry import (
     DATA_YEAR,
     HEAT_LEVELS,
     HEAT_SOURCES,
+    IDEES_EU,
+    NODES_WITHOUT_IDEES,
     SECTORS,
     kiln_fuel,
     model_nodes,
     spread_capacity_existing,
 )
+from zen_europe.utils.utils import instance_cache
 
 if TYPE_CHECKING:
     from zen_creator import Dataset, Element
@@ -78,10 +78,6 @@ class IndustryHeatSupply(DatasetCollection):
             ),
         }
 
-    @property
-    def _production_data(self) -> IndustryProductionData:
-        return cast(IndustryProductionData, self.data["industry_production_data"])
-
     # ---------- boilers ----------
 
     def get_capacity_existing_boiler(self, element: Element) -> Attribute:
@@ -108,12 +104,10 @@ class IndustryHeatSupply(DatasetCollection):
                     "country (EU27 for NO and UK; BFE industry fuel mix for CH). "
                     "'Biomass and waste' is biomass, except in paper, where it is "
                     "split by the Eurostat paper industry final consumption "
-                    "(FC_IND_PPP_E). There are no existing electrode boilers. "
-                    "Boilers below "
-                    f"{min_capacity} GW per node (general industry assumptions) "
-                    "are dropped; the "
-                    "capacity is assumed to be built evenly over the lifetime of the "
-                    "technology."
+                    "(FC_IND_PPP_E). There are no existing electrode boilers. Boilers "
+                    f"below {min_capacity} GW per node (general industry assumptions) "
+                    "are dropped; the capacity is assumed to be built evenly over the "
+                    "lifetime of the technology."
                 ),
                 metadata=self.metadata,
             ),
@@ -254,21 +248,14 @@ class IndustryHeatSupply(DatasetCollection):
         levels = HEAT_LEVELS[: HEAT_LEVELS.index(element.temp_level) + 1]
         nodes = model_nodes(element)
         demand = self._calculate_heat_demand(element.sector, levels, nodes)
-        margin = self._assumptions.get_value("capacity_limit_margin")
-        limit = (demand * margin).reindex(pd.Index(nodes, name="node")).fillna(0.0)
-        return element.capacity_limit.set_data(
-            default_value=np.inf,
-            unit="GW",
-            df=limit.rename("capacity_limit").to_frame(),
-            source=SourceInformation(
-                description=(
-                    "The flat heat demand of the storage's band and all lower bands "
-                    "(reachable via the temperature cascade) times the capacity limit "
-                    f"margin of {margin} (general industry assumptions); "
-                    "0 at nodes without demand."
-                ),
-                metadata=self.metadata,
+        return self._set_capacity_limit(
+            element,
+            demand,
+            description=(
+                "The flat heat demand of the storage's band and all lower bands "
+                "(reachable via the temperature cascade)"
             ),
+            nodes=nodes,
         )
 
     # ---------- kiln fuel ----------
@@ -324,24 +311,39 @@ class IndustryHeatSupply(DatasetCollection):
     # ---------- helpers ----------
 
     @property
+    def _production_data(self) -> IndustryProductionData:
+        return cast(IndustryProductionData, self.data["industry_production_data"])
+
+    @property
     def _assumptions(self) -> IndustryGeneralAssumptions:
         return cast(
             IndustryGeneralAssumptions, self.data["industry_general_assumptions"]
         )
 
-    def _set_capacity_limit(self, element: Element, demand: pd.Series) -> Attribute:
-        """Limit the zero-cost pass-through technologies, see docs, 'Diffusion'."""
+    def _set_capacity_limit(
+        self,
+        element: Element,
+        demand: pd.Series,
+        description: str = "The flat demand",
+        nodes: tuple[str, ...] | None = None,
+    ) -> Attribute:
+        """Limit a technology to the demand times the capacity limit margin, see
+        docs, 'Diffusion'. With `nodes`, the limit is 0 at nodes without demand."""
         margin = self._assumptions.get_value("capacity_limit_margin")
-        limit = (demand * margin).rename("capacity_limit")
+        limit = demand * margin
+        description = (
+            f"{description} times the capacity limit margin of {margin} (general "
+            "industry assumptions), see docs, 'Diffusion'."
+        )
+        if nodes is not None:
+            limit = limit.reindex(pd.Index(nodes, name="node")).fillna(0.0)
+            description += " 0 at nodes without demand."
         return element.capacity_limit.set_data(
             default_value=np.inf,
             unit="GW",
-            df=limit.to_frame(),
+            df=limit.rename("capacity_limit").to_frame(),
             source=SourceInformation(
-                description=(
-                    f"The flat demand times the capacity limit margin of {margin} "
-                    "(general industry assumptions), see docs, 'Diffusion'."
-                ),
+                description=description,
                 metadata=self.metadata,
             ),
         )
@@ -357,7 +359,7 @@ class IndustryHeatSupply(DatasetCollection):
         """Heat demand (GW) of the sector's products in the given bands."""
         return self._calculate_band_demand(nodes).loc[sector].loc[list(levels)].sum()
 
-    @cache
+    @instance_cache
     def _calculate_band_demand(self, nodes: tuple[str, ...]) -> pd.DataFrame:
         """Heat demand (GW) per sector and band (rows) and node (columns)."""
         production = self._production_data
@@ -370,7 +372,7 @@ class IndustryHeatSupply(DatasetCollection):
         }
         return pd.DataFrame(demand).T.rename_axis(["sector", "level"])
 
-    @cache
+    @instance_cache
     def _calculate_boiler_capacity(self, nodes: tuple[str, ...]) -> pd.DataFrame:
         """Boiler capacity (GW) per sector and node (rows) and fuel (columns): the
         sector's heat demand split by its fuel mix."""

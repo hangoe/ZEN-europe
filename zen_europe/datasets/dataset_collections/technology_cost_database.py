@@ -319,7 +319,7 @@ class TechnologyCostDatabase(DatasetCollection):
         plant_size: str | None = None,
         metric: str = "mean",
         reference_year: int | None = None,
-            proxy_element_name: str | None = None
+        proxy_element_name: str | None = None,
     ) -> tuple[pd.Series, list[str]]:
         """Conversion efficiency [-] for `technology`, indexed by year.
 

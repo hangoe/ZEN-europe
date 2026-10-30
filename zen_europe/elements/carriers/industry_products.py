@@ -1,3 +1,4 @@
+# TODO: Jacob decide how to model this. Should be one element per module.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar

@@ -1,3 +1,4 @@
+# TODO: Jacob decide how to model this. Should be one element per module.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar
@@ -101,6 +102,3 @@ class PaperProduction(IndustryProduction, ConversionTechnology):
 class FoodProduction(IndustryProduction, ConversionTechnology):
     name: str = "food_production"
     sector: ClassVar[str] = "food"
-
-
-# TODO: one module per production (TBD with Christoph and Jacob)

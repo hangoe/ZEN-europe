@@ -8,10 +8,6 @@ from .diesel import Diesel
 from .district_heat import DistrictHeat
 from .electricity import Electricity
 from .fuel_for_cement import FuelForCement
-from .fuel_to_kiln import (
-    FuelToKilnCeramic,
-    FuelToKilnGlass,
-)
 from .gasoline import Gasoline
 from .hard_coal import HardCoal
 from .heat import Heat
@@ -37,6 +33,10 @@ from .industry_products import (
     Paper,
 )
 from .kerosene import Kerosene
+from .kiln_fuel import (
+    KilnFuelCeramic,
+    KilnFuelGlass,
+)
 from .lignite import Lignite
 from .lng import LNG
 from .methanol import Methanol
@@ -84,8 +84,8 @@ __all__ = [
     "CrudeOil",
     "FuelForCement",
     "Uranium",
-    "FuelToKilnGlass",
-    "FuelToKilnCeramic",
+    "KilnFuelGlass",
+    "KilnFuelCeramic",
     "HeatIndustry0100Glass",
     "HeatIndustry0100Ceramic",
     "HeatIndustry0100Paper",

@@ -46,6 +46,8 @@ class ONSIndustryEmissions(Dataset[pd.DataFrame]):
         )
 
     def _set_path(self) -> Path:
+        if self.source_path is None:
+            raise ValueError("source_path must be set to load the dataset.")
         return (
             self.source_path
             / "01-energy_system"

@@ -1,3 +1,4 @@
+# TODO: Jacob decide how to model this. Should be one element per module.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar
@@ -119,43 +120,43 @@ class KilnFuelIndustry:
         return kiln_fuel(self.sector)
 
 
-class NaturalGasToKilnfuel(KilnFuelIndustry):
+class NaturalGasToKilnFuel(KilnFuelIndustry):
     fuel: ClassVar[str] = "natural_gas"
 
 
-class HydrogenToKilnfuel(KilnFuelIndustry):
+class HydrogenToKilnFuel(KilnFuelIndustry):
     fuel: ClassVar[str] = "hydrogen"
 
 
-class ElectricityToKilnfuel(KilnFuelIndustry):
+class ElectricityToKilnFuel(KilnFuelIndustry):
     fuel: ClassVar[str] = "electricity"
 
 
-class NaturalGasToKilnfuelGlass(NaturalGasToKilnfuel, ConversionTechnology):
-    name: str = "natural_gas_to_kilnfuel_glass"
+class NaturalGasToKilnFuelGlass(NaturalGasToKilnFuel, ConversionTechnology):
+    name: str = "natural_gas_to_kiln_fuel_glass"
     sector: ClassVar[str] = "glass"
 
 
-class NaturalGasToKilnfuelCeramic(NaturalGasToKilnfuel, ConversionTechnology):
-    name: str = "natural_gas_to_kilnfuel_ceramic"
+class NaturalGasToKilnFuelCeramic(NaturalGasToKilnFuel, ConversionTechnology):
+    name: str = "natural_gas_to_kiln_fuel_ceramic"
     sector: ClassVar[str] = "ceramic"
 
 
-class HydrogenToKilnfuelGlass(HydrogenToKilnfuel, ConversionTechnology):
-    name: str = "hydrogen_to_kilnfuel_glass"
+class HydrogenToKilnFuelGlass(HydrogenToKilnFuel, ConversionTechnology):
+    name: str = "hydrogen_to_kiln_fuel_glass"
     sector: ClassVar[str] = "glass"
 
 
-class HydrogenToKilnfuelCeramic(HydrogenToKilnfuel, ConversionTechnology):
-    name: str = "hydrogen_to_kilnfuel_ceramic"
+class HydrogenToKilnFuelCeramic(HydrogenToKilnFuel, ConversionTechnology):
+    name: str = "hydrogen_to_kiln_fuel_ceramic"
     sector: ClassVar[str] = "ceramic"
 
 
-class ElectricityToKilnfuelGlass(ElectricityToKilnfuel, ConversionTechnology):
-    name: str = "electricity_to_kilnfuel_glass"
+class ElectricityToKilnFuelGlass(ElectricityToKilnFuel, ConversionTechnology):
+    name: str = "electricity_to_kiln_fuel_glass"
     sector: ClassVar[str] = "glass"
 
 
-class ElectricityToKilnfuelCeramic(ElectricityToKilnfuel, ConversionTechnology):
-    name: str = "electricity_to_kilnfuel_ceramic"
+class ElectricityToKilnFuelCeramic(ElectricityToKilnFuel, ConversionTechnology):
+    name: str = "electricity_to_kiln_fuel_ceramic"
     sector: ClassVar[str] = "ceramic"

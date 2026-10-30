@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from functools import cache, cached_property
+from functools import cached_property
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import pandas as pd
 from zen_creator import Attribute, DatasetCollection
@@ -39,20 +39,21 @@ from zen_europe.utils.constants import Constants
 from zen_europe.utils.industry import (
     DATA_YEAR,
     HEAT_LEVELS,
+    IDEES_EU,
+    PROXY_NODES,
     SECTORS,
     kiln_fuel,
     model_nodes,
     spread_capacity_existing,
 )
+from zen_europe.utils.utils import instance_cache
 
 if TYPE_CHECKING:
     from zen_creator import Dataset, Element
     from zen_creator.utils.settings import Settings
 
-NODES_WITHOUT_IDEES = ("CH", "NO", "UK")
-IDEES_EU = "EU27"
-# proxy node of the nodes without JRC-IDEES data: CH as AT, NO as FI, UK as DE
-PROXY_NODES = {"CH": "AT", "NO": "FI", "UK": "DE"}
+# a production series or frame, see `_to_t_per_hour`
+ProductionT = TypeVar("ProductionT", pd.Series, pd.DataFrame)
 # nodes scaled from their proxy node by population (World Bank)
 POPULATION_SCALED = ("UK",)
 # JRC-EU-TIMES processes of the glass routes and paper sub-processes
@@ -131,11 +132,9 @@ class IndustryProductionData(DatasetCollection):
                     "the JRC-IDEES thermal energy consumption and the Rehfeldt et al. "
                     "(2017) fuel intensity (ceramic), or from the Rehfeldt et al. "
                     "(2017) activity split by the FAOSTAT production (food). Nodes "
-                    "without JRC-IDEES data use a "
-                    "proxy node (CH as AT, NO as FI, UK as DE scaled by the World "
-                    "Bank population); "
-                    "for paper, their consumption from the JRC BAT reference "
-                    "document is used."
+                    "without JRC-IDEES data use a proxy node (CH as AT, NO as FI, UK "
+                    "as DE scaled by the World Bank population); for paper, their "
+                    "consumption from the JRC BAT reference document is used."
                 ),
                 metadata=self.metadata,
             ),
@@ -177,6 +176,8 @@ class IndustryProductionData(DatasetCollection):
         sector = element.sector
         energy = self.calculate_energy_intensity(sector)
         heat = self.calculate_heat_conversion_factors(sector)
+        efficiency = self._assumptions.get_value("reference_boiler_efficiency")
+        switchable = self._assumptions.get_value("kiln_switchable_share", "ceramic")
         unit = "GW/(tproduct/h)"
         cf = [
             {carrier: {"default_value": value, "unit": unit}}
@@ -209,11 +210,10 @@ class IndustryProductionData(DatasetCollection):
                     "below 200 °C is split into temperature bands with the Rehfeldt "
                     "temperature distribution and, for 100-200 °C, with Wolf (2017), "
                     "and converted from final energy to useful heat with a reference "
-                    "boiler efficiency of "
-                    f"{self._assumptions.get_value('reference_boiler_efficiency'):.0%}"
-                    "; the rest is fuel, split by the JRC-IDEES fuel mix. The natural "
-                    "gas of glass and ceramic is supplied as kiln fuel; for ceramic, "
-                    "an assumed 97.4 % of it can switch fuel, since the ceramic BREF "
+                    f"boiler efficiency of {efficiency:.0%}; the rest is fuel, split "
+                    "by the JRC-IDEES fuel mix. The natural gas of glass and ceramic "
+                    "is supplied as kiln fuel; for ceramic, an assumed "
+                    f"{switchable:.1%} of it can switch fuel, since the ceramic BREF "
                     "(JRC, Final Draft, April 2026, Sections 4.2.1-4.2.3) limits "
                     "electrified kilns to below 1600 °C and the > 1000 °C share of "
                     "technical ceramics in Rehfeldt et al. (2017) is treated as not "
@@ -236,7 +236,8 @@ class IndustryProductionData(DatasetCollection):
                     "capacity (glass, paper) at 8760 hours per year; for ceramic, "
                     "food and the paper nodes without JRC-IDEES data it is the "
                     "product demand (see demand) divided by an assumed capacity "
-                    f"utilisation of {self._assumptions.get_value('capacity_utilisation')} "
+                    "utilisation of "
+                    f"{self._assumptions.get_value('capacity_utilisation')} "
                     "(general industry assumptions). It is assumed to be built "
                     "evenly over the lifetime of the technology."
                 ),
@@ -366,10 +367,12 @@ class IndustryProductionData(DatasetCollection):
     # ---------- data used by other collections ----------
 
     def calculate_demand(self, sector: str, nodes: tuple[str, ...]) -> pd.Series:
-        """Product demand (t/h): physical production, averaged over the year."""
-        demand = self._calculate_production(nodes)[sector].rename("demand")
-        demand.index.name = "node"
-        return demand
+        """Product demand (t/h): the physical production, named as the demand."""
+        return (
+            self.calculate_production(sector, nodes)
+            .rename("demand")
+            .rename_axis("node")
+        )
 
     def calculate_production(self, sector: str, nodes: tuple[str, ...]) -> pd.Series:
         """Physical production (t/h), averaged over the year."""
@@ -445,43 +448,39 @@ class IndustryProductionData(DatasetCollection):
         heat = self.calculate_heat_conversion_factors(element.sector)
         return [level for level in HEAT_LEVELS if heat[level] > 0]
 
-    @cache
+    @instance_cache
     def _calculate_capacity(self, nodes: tuple[str, ...]) -> pd.DataFrame:
         """Installed production capacity (t/h) per node and sector; the production
         divided by the capacity utilisation where no capacity data exist."""
         idees = cast(JRCIDEES, self.data["jrc_idees"])
         production = self._calculate_production(nodes)
-        capacity = production / self._assumptions.get_value("capacity_utilisation")
-        capacity["glass"] = (
+        utilisation = self._assumptions.get_value("capacity_utilisation")
+        capacity = production / utilisation
+        capacity["glass"] = self._to_t_per_hour(
             self._fill_proxy_nodes(
                 self._reindex_nodes(
                     idees.get_industry_installed_capacity("glass", DATA_YEAR), nodes
                 )
             )
-            * 1000.0
-            / Constants.HOURS_PER_YEAR
-        )  # kt/a -> t/h
-        capacity["paper"] = (
+        )
+        capacity["paper"] = self._to_t_per_hour(
             self._reindex_nodes(
                 idees.get_industry_installed_capacity("paper", DATA_YEAR), nodes
             )
-            * 1000.0
-            / Constants.HOURS_PER_YEAR
-        )  # kt/a -> t/h
+        )
         # paper: the nodes without JRC-IDEES (JRC BAT consumption)
         jrc_bat = cast(JRCBATPaper, self.data["jrc_bat_paper"])
         bat_nodes = jrc_bat.get_consumption().index
         capacity.loc[bat_nodes, "paper"] = (
-            production.loc[bat_nodes, "paper"]
-            / self._assumptions.get_value("capacity_utilisation")
+            production.loc[bat_nodes, "paper"] / utilisation
         )
         return capacity
 
-    @cache
+    @instance_cache
     def _calculate_production(self, nodes: tuple[str, ...]) -> pd.DataFrame:
         """Physical production (t/h) averaged over the year, per node and sector."""
         idees = cast(JRCIDEES, self.data["jrc_idees"])
-        production = (
+        production = self._to_t_per_hour(
             pd.DataFrame(
                 {
                     "glass": self._fill_proxy_nodes(
@@ -496,19 +495,15 @@ class IndustryProductionData(DatasetCollection):
                     ),
                 }
             )
-            * 1000.0
-            / Constants.HOURS_PER_YEAR
-        )  # kt/a -> t/h
+        )
         production["food"] = self._calculate_food_production(nodes)
         # paper: the consumption of the nodes without JRC-IDEES (JRC BAT)
         jrc_bat = cast(JRCBATPaper, self.data["jrc_bat_paper"])
         consumption = jrc_bat.get_consumption()
-        production.loc[consumption.index, "paper"] = (
-            consumption * 1000.0 / Constants.HOURS_PER_YEAR
-        )
+        production.loc[consumption.index, "paper"] = self._to_t_per_hour(consumption)
         return production
 
-    @cache
+    @instance_cache
     def _calculate_ceramic_output(self, nodes: tuple[str, ...]) -> pd.Series:
         """Ceramic output (kt/a): JRC-IDEES thermal energy / Rehfeldt fuel intensity."""
         idees = cast(JRCIDEES, self.data["jrc_idees"])
@@ -519,7 +514,7 @@ class IndustryProductionData(DatasetCollection):
         output = thermal * Constants.GJ_PER_KTOE / (intensity * 1000)
         return self._fill_proxy_nodes(self._reindex_nodes(output, nodes))
 
-    @cache
+    @instance_cache
     def _calculate_food_production(self, nodes: tuple[str, ...]) -> pd.Series:
         """Food production (t/h): Rehfeldt (2017) activity split by FAOSTAT
         production."""
@@ -538,6 +533,11 @@ class IndustryProductionData(DatasetCollection):
         shares = production.div(production.sum(axis=1), axis=0).fillna(0.0)
         activity = shares.mul(activity, axis=0).sum()  # Mt/a
         return activity * 1e6 / Constants.HOURS_PER_YEAR  # Mt/a -> t/h
+
+    @staticmethod
+    def _to_t_per_hour(data: ProductionT) -> ProductionT:
+        """Convert a production from kt/a to t/h."""
+        return data * 1000.0 / Constants.HOURS_PER_YEAR
 
     @staticmethod
     def _reindex_nodes(data: pd.Series, nodes: tuple[str, ...]) -> pd.Series:

@@ -17,11 +17,14 @@ if TYPE_CHECKING:
 # year of the production, energy and heat statistics
 DATA_YEAR = 2023
 SECTORS = ("glass", "ceramic", "paper", "food")
-# sectors whose > 200 °C natural gas can switch kiln fuel
-KILN_SECTORS = ("glass", "ceramic")
 HEAT_LEVELS = ("0_100", "100_150", "150_200")
 HEAT_SOURCES = ("waste_heat", "water")
 BOILER_FUELS = ("biomass", "natural_gas", "electrode", "oil", "coal", "waste")
+# proxy node of the nodes without JRC-IDEES data: CH as AT, NO as FI, UK as DE
+PROXY_NODES = {"CH": "AT", "NO": "FI", "UK": "DE"}
+NODES_WITHOUT_IDEES = tuple(PROXY_NODES)
+# JRC-IDEES region of the EU27 aggregate
+IDEES_EU = "EU27"
 
 
 def heat_carrier(level: str, sector: str) -> str:
@@ -31,7 +34,7 @@ def heat_carrier(level: str, sector: str) -> str:
 
 def kiln_fuel(sector: str) -> str:
     """Kiln fuel carrier of a sector."""
-    return f"fuel_to_kiln_{sector}"
+    return f"kiln_fuel_{sector}"
 
 
 def model_nodes(element: Element) -> tuple[str, ...]:

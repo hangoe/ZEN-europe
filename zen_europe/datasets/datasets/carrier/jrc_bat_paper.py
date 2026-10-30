@@ -6,10 +6,8 @@ import pandas as pd
 from zen_creator.datasets.datasets.dataset import Dataset
 from zen_creator.datasets.datasets.metadata import MetaData
 
+from zen_europe.utils.industry import NODES_WITHOUT_IDEES
 from zen_europe.utils.utils import convert_country_names
-
-# countries without JRC-IDEES data
-NODES = ["CH", "NO", "UK"]
 
 
 class JRCBATPaper(Dataset[pd.DataFrame]):
@@ -51,4 +49,6 @@ class JRCBATPaper(Dataset[pd.DataFrame]):
 
     def get_consumption(self) -> pd.Series:
         """Paper consumption (kt/a) in 2008 of CH, NO and UK."""
-        return self.data.loc[NODES, "consumption_1000t_2008"].astype(float)
+        return self.data.loc[
+            list(NODES_WITHOUT_IDEES), "consumption_1000t_2008"
+        ].astype(float)

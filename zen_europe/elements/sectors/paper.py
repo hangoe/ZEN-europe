@@ -5,9 +5,7 @@ from zen_europe.elements.carriers.heat_industry import (
     HeatIndustry100150Paper,
     HeatIndustry150200Paper,
 )
-from zen_europe.elements.carriers.industry_products import (
-    Paper,
-)
+from zen_europe.elements.carriers.industry_products import Paper
 from zen_europe.elements.conversion_technologies.boiler_industry import (
     BiomassBoilerIndustryPaper,
     CoalBoilerIndustryPaper,
@@ -31,9 +29,7 @@ from zen_europe.elements.conversion_technologies.heat_pump_industry import (
 from zen_europe.elements.conversion_technologies.industry_production import (
     PaperProduction,
 )
-from zen_europe.elements.storage_technologies.industry_DSM import (
-    PaperDSM,
-)
+from zen_europe.elements.storage_technologies.industry_DSM import PaperDSM
 from zen_europe.elements.storage_technologies.industry_TES import (
     IndustryTESSteam150200Paper,
     IndustryTESWater0100Paper,

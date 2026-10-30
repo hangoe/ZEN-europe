@@ -1,16 +1,12 @@
 from zen_creator import Sector
 
-from zen_europe.elements.carriers.fuel_to_kiln import (
-    FuelToKilnGlass,
-)
 from zen_europe.elements.carriers.heat_industry import (
     HeatIndustry0100Glass,
     HeatIndustry100150Glass,
     HeatIndustry150200Glass,
 )
-from zen_europe.elements.carriers.industry_products import (
-    Glass,
-)
+from zen_europe.elements.carriers.industry_products import Glass
+from zen_europe.elements.carriers.kiln_fuel import KilnFuelGlass
 from zen_europe.elements.conversion_technologies.boiler_industry import (
     BiomassBoilerIndustryGlass,
     CoalBoilerIndustryGlass,
@@ -35,16 +31,14 @@ from zen_europe.elements.conversion_technologies.industry_production import (
     GlassProduction,
 )
 from zen_europe.elements.conversion_technologies.kiln_fuel_industry import (
-    ElectricityToKilnfuelGlass,
-    HydrogenToKilnfuelGlass,
-    NaturalGasToKilnfuelGlass,
+    ElectricityToKilnFuelGlass,
+    HydrogenToKilnFuelGlass,
+    NaturalGasToKilnFuelGlass,
 )
 from zen_europe.elements.retrofitting_technologies.industry_post_comb import (
     GlassPostComb,
 )
-from zen_europe.elements.storage_technologies.industry_DSM import (
-    GlassDSM,
-)
+from zen_europe.elements.storage_technologies.industry_DSM import GlassDSM
 from zen_europe.elements.storage_technologies.industry_TES import (
     IndustryTESSteam150200Glass,
     IndustryTESWater0100Glass,
@@ -76,7 +70,7 @@ class GlassSector(Sector):
             HeatIndustry0100Glass,
             HeatIndustry100150Glass,
             HeatIndustry150200Glass,
-            FuelToKilnGlass,
+            KilnFuelGlass,
             HeatPumpIndustry0100WasteHeatGlass,
             HeatPumpIndustry0100WaterGlass,
             HeatPumpIndustry100150WasteHeatGlass,
@@ -91,9 +85,9 @@ class GlassSector(Sector):
             WasteBoilerIndustryGlass,
             HeatIndustryTempConversion150Glass,
             HeatIndustryTempConversion100Glass,
-            NaturalGasToKilnfuelGlass,
-            HydrogenToKilnfuelGlass,
-            ElectricityToKilnfuelGlass,
+            NaturalGasToKilnFuelGlass,
+            HydrogenToKilnFuelGlass,
+            ElectricityToKilnFuelGlass,
             IndustryTESWater0100Glass,
             IndustryTESWater100150Glass,
             IndustryTESSteam150200Glass,

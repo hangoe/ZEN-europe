@@ -5,9 +5,7 @@ from zen_europe.elements.carriers.heat_industry import (
     HeatIndustry100150Food,
     HeatIndustry150200Food,
 )
-from zen_europe.elements.carriers.industry_products import (
-    Food,
-)
+from zen_europe.elements.carriers.industry_products import Food
 from zen_europe.elements.conversion_technologies.boiler_industry import (
     BiomassBoilerIndustryFood,
     CoalBoilerIndustryFood,
@@ -31,9 +29,7 @@ from zen_europe.elements.conversion_technologies.heat_pump_industry import (
 from zen_europe.elements.conversion_technologies.industry_production import (
     FoodProduction,
 )
-from zen_europe.elements.storage_technologies.industry_DSM import (
-    FoodDSM,
-)
+from zen_europe.elements.storage_technologies.industry_DSM import FoodDSM
 from zen_europe.elements.storage_technologies.industry_TES import (
     IndustryTESSteam150200Food,
     IndustryTESWater0100Food,

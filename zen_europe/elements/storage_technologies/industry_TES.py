@@ -1,3 +1,4 @@
+# TODO: Jacob decide how to model this. Should be one element per module.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar
@@ -112,9 +113,6 @@ class IndustryTES:
         return IndustryGeneralAssumptions(self.source_path)
 
 
-# energy-to-power ratio: water tanks are intraday buffers of at least 1 h, steam
-# accumulators are short-duration pressure vessels (see the general industry
-# assumptions)
 class IndustryTESWater0100(IndustryTES):
     temp_level: ClassVar[str] = "0_100"
     storage_type: ClassVar[str] = "water tank"

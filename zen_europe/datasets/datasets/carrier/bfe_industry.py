@@ -34,7 +34,7 @@ class BFEIndustry(Dataset[pd.DataFrame]):
     def _set_metadata(self) -> MetaData:
         return MetaData(
             name=self.name,
-            title=("Energieverbrauch in der Industrie und im Dienstleistungssektor"),
+            title="Energieverbrauch in der Industrie und im Dienstleistungssektor",
             author=["Bundesamt für Energie BFE"],
             publication="Bundesamt für Energie BFE",
             publication_year=2025,
@@ -49,11 +49,11 @@ class BFEIndustry(Dataset[pd.DataFrame]):
 
     def _set_data(self) -> pd.DataFrame:
         sheets = pd.read_excel(self.path, sheet_name=list(SHEETS), header=None)
-        data = pd.concat(
+        # TJ
+        return pd.concat(
             {sheet: self._extract_sheet(df) for sheet, df in sheets.items()},
             names=["sheet", "branch"],
         )
-        return data  # TJ
 
     @staticmethod
     def _extract_sheet(sheet: pd.DataFrame) -> pd.DataFrame:

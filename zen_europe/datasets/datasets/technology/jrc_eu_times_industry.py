@@ -10,12 +10,7 @@ from zen_creator.datasets.datasets.metadata import MetaData
 BASE_YEAR = 2006
 # row of the column labels in the IND sheet
 HEADER_ROW = 4
-PARAMETERS = {
-    "INVCOST": "INVCOST",
-    "FIXOM": "FIXOM",
-    "VAROM": "VAROM",
-    "LIFE": "LIFE",
-}
+PARAMETERS = ["INVCOST", "FIXOM", "VAROM", "LIFE"]
 
 
 class JRCEUTIMESIndustry(Dataset[pd.DataFrame]):
@@ -60,7 +55,7 @@ class JRCEUTIMESIndustry(Dataset[pd.DataFrame]):
         sheet = sheet.iloc[HEADER_ROW + 1 :]
         # a process spans several rows, only the first one holds its name
         technology = sheet["TechName"].replace("", None).ffill()
-        parameters = sheet[list(PARAMETERS)].rename(columns=PARAMETERS)
+        parameters = sheet[PARAMETERS]
         parameters = parameters.apply(
             lambda column: pd.to_numeric(
                 column.astype(str).str.strip(), errors="coerce"

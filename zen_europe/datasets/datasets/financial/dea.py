@@ -202,9 +202,8 @@ _SOURCES: dict[str, tuple[str, str]] = {
     ),
     "ph": (
         "technology_data_for_industrial_process_heat.xlsx",
-        "https://ens.dk/en/analyses-and-statistics/technology-data-industrial-process-heat"
+        "https://ens.dk/en/analyses-and-statistics/technology-data-industrial-process-heat",
     ),
-
 }
 
 _REQUIRED_SOURCE_COLUMNS = {
@@ -389,9 +388,8 @@ _RF_ALT_SCENARIO_TECHS = {"anaerobic_digestion", "biomethane_conversion"}
 _RF_MONEY_YEAR_SRC: dict[str, int] = {"pyrolysis": 2025}
 _RF_DEFAULT_MONEY_YEAR_SRC = 2020
 
-# internal technology name -> `ws`-sheet name in the industrial-process-heat workbook. The gas
-# and oil boiler share one DEA sheet. Costs are (par_string, multiplier_to_schema_unit), since
-# the par labels differ between the sheets.
+# internal technology name -> `ws`-sheet name in the industrial-process-heat
+# workbook; the gas and oil boiler share one DEA sheet
 _PH_TECHS: dict[str, str] = {
     "heat_pump_industry_125": "2.a High temp. hp Up to 125C",
     "heat_pump_industry_150": "2.b High temp. hp Up to 150",
@@ -401,6 +399,8 @@ _PH_TECHS: dict[str, str] = {
     "biomass_boiler_industry": "6.2 Boiler, biomass",
     "coal_boiler_industry": "6.3 Boiler, coal",
 }
+# costs are (par_string, multiplier_to_schema_unit), since the par labels differ
+# between the sheets
 _PH_COST_PARS_DEFAULT: dict[str, tuple[str, float]] = {
     "capex": ("Nominal investment (*total) [MEUR/MW]", 1000.0),
     "fopex": ("Fixed O&M  [EUR/MW_y]", 1 / 1000),
@@ -418,10 +418,11 @@ _PH_COST_PARS: dict[str, dict[str, tuple[str, float]]] = {
         "vopex": ("Variable O&M [€/MWh]", 1.0),
     },
 }
-# only the boilers; the heat pumps' nominal-load COP is given per temperature lift instead
+# only the boilers; the heat pumps' nominal-load COP is given per temperature lift
+# instead
 _PH_EFFICIENCY_PAR = "Total efficiency, net [%], nominel load"
-# The workbook's `priceyear` column is blank for some sheets; its Index sheet states "All cost
-# data is in 2025€".
+# The workbook's `priceyear` column is blank for some sheets; its Index sheet
+# states "All cost data is in 2025€".
 _PH_MONEY_YEAR_SRC = 2025
 
 
@@ -548,8 +549,8 @@ class DEA(Dataset[pd.DataFrame]):
         financial, technical = self._load("main")
         ih_financial, ih_technical = self._load("ih")
         ccs_financial, ccs_technical = self._load("ccs")
-        rf_financial, rf_technical = self._load("rf", rf_category_fixup=True)
-        ph_financial, ph_technical = self._load("ph", rf_category_fixup=True)
+        rf_financial, rf_technical = self._load("rf", category_fixup=True)
+        ph_financial, ph_technical = self._load("ph", category_fixup=True)
 
         rows: list[tuple] = []
         rows += self._parse_main(financial, technical)
@@ -565,29 +566,24 @@ class DEA(Dataset[pd.DataFrame]):
         return data
 
     def _load(
-        self, source: str, rf_category_fixup: bool = False
+        self, source: str, category_fixup: bool = False
     ) -> tuple[pd.DataFrame, pd.DataFrame]:
         """Load one of DEA's "alldata_flat" workbooks and split it into
         financial/technical.
 
-        Downloads the workbook to `self.path` on first use (see `_download`); subsequent
-        loads
-        read the cached local file. Mirrors the legacy script's `load_DEA`: split rows
-        by the
-        `cat` column into "Financial data" and "Energy/technical data". The
-        renewable-fuels
-        workbook's `cat` column has several whitespace-inconsistent "Financial data..."
-        variants
-        (`rf_category_fixup=True` normalizes them to "Financial data", exactly as the
-        legacy
-        script did); the same holds for the industrial-process-heat workbook.
+        Downloads the workbook to `self.path` on first use (see `_download`);
+        subsequent loads read the cached local file. Rows are split by the `cat`
+        column into "Financial data" and "Energy/technical data". The `cat` column of
+        the renewable-fuels and industrial-process-heat workbooks has several
+        whitespace-inconsistent "Financial data..." variants; `category_fixup=True`
+        normalizes them to "Financial data".
         """
         filename, url = _SOURCES[source]
         file_path = self.path / filename
         if get_active_cache_settings().overwrite_dea or not file_path.exists():
             self._download(url, file_path)
         raw = self._read_source_workbook(file_path)
-        if rf_category_fixup:
+        if category_fixup:
             raw = raw.copy()
             contains_financial_data = raw["cat"].str.contains(
                 "Financial data", na=False
@@ -1005,37 +1001,59 @@ class DEA(Dataset[pd.DataFrame]):
             )
         return rows
 
-    def _parse_process_heat(self, financial: pd.DataFrame, technical: pd.DataFrame) -> list[tuple]:
+    def _parse_process_heat(
+        self, financial: pd.DataFrame, technical: pd.DataFrame
+    ) -> list[tuple]:
         """Fills the industrial boiler and high-temperature heat pump rows.
 
-        The rows are selected by `ws` sheet, as the `Technology` labels repeat across sheets.
-        The efficiency is labelled "[%]" but reported as a fraction.
+        The rows are selected by `ws` sheet, as the `Technology` labels repeat across
+        sheets. The efficiency is labelled "[%]" but reported as a fraction.
         """
         rows: list[tuple] = []
         schema_units = {"capex": "Euro/kW", "fopex": "Euro/kW", "vopex": "Euro/MWh"}
         for technology, ws in _PH_TECHS.items():
             fin_rows = financial[financial["ws"] == ws]
             tech_rows = technical[technical["ws"] == ws]
+            cost_pars = _PH_COST_PARS.get(technology, _PH_COST_PARS_DEFAULT)
             for scenario, est in _SCENARIOS.items():
-                for variable, (par, multiplier) in _PH_COST_PARS.get(technology, _PH_COST_PARS_DEFAULT).items():
+                for variable, (par, multiplier) in cost_pars.items():
                     sel = fin_rows[(fin_rows["par"] == par) & (fin_rows["est"] == est)]
                     for _, row in sel.iterrows():
                         rows.append(
                             (
-                                technology, "M", scenario, variable, int(row["year"]),
-                                float(row["val"]) * multiplier, schema_units[variable],
-                                _PH_MONEY_YEAR_SRC, float(row["val"]), row["unit"],
+                                technology,
+                                "M",
+                                scenario,
+                                variable,
+                                int(row["year"]),
+                                float(row["val"]) * multiplier,
+                                schema_units[variable],
+                                _PH_MONEY_YEAR_SRC,
+                                float(row["val"]),
+                                row["unit"],
                             )
                         )
-                sel = tech_rows[(tech_rows["par"] == _PH_EFFICIENCY_PAR) & (tech_rows["est"] == est)]
+                sel = tech_rows[
+                    (tech_rows["par"] == _PH_EFFICIENCY_PAR) & (tech_rows["est"] == est)
+                ]
                 for _, row in sel.iterrows():
                     rows.append(
                         (
-                            technology, "M", scenario, "efficiency", int(row["year"]),
-                            float(row["val"]), "1", None, float(row["val"]), row["unit"],
+                            technology,
+                            "M",
+                            scenario,
+                            "efficiency",
+                            int(row["year"]),
+                            float(row["val"]),
+                            "1",
+                            None,
+                            float(row["val"]),
+                            row["unit"],
                         )
                     )
-            rows += self._parse_lifetime_and_construction_time(tech_rows, technology, "M", _SCENARIOS)
+            rows += self._parse_lifetime_and_construction_time(
+                tech_rows, technology, "M", _SCENARIOS
+            )
         return rows
 
     @staticmethod

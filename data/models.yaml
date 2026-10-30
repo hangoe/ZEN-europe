@@ -1,28 +1,4 @@
 # Model variants: settings patches on top of zen_europe_config.yaml.
-defaults:
-  settings:
-    structure:
-      set_sectors:
-        - electricity
-        - carbon
-        - gas
-        - heat
-        - district_heating
-        - hydrogen
-        - ammonia
-        - cement
-        - methanol
-        - refining
-        - aviation
-        - shipping
-        - steel
-        - passenger_transport
-        - truck_transport
-        - glass
-        - ceramic
-        - paper
-        - food
-
 models:
   # ZEN-europe: glass, ceramic, paper and food with full flexibility (thermal
   # energy storage and demand-side management)

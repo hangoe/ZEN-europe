@@ -1,16 +1,12 @@
 from zen_creator import Sector
 
-from zen_europe.elements.carriers.fuel_to_kiln import (
-    FuelToKilnCeramic,
-)
 from zen_europe.elements.carriers.heat_industry import (
     HeatIndustry0100Ceramic,
     HeatIndustry100150Ceramic,
     HeatIndustry150200Ceramic,
 )
-from zen_europe.elements.carriers.industry_products import (
-    Ceramic,
-)
+from zen_europe.elements.carriers.industry_products import Ceramic
+from zen_europe.elements.carriers.kiln_fuel import KilnFuelCeramic
 from zen_europe.elements.conversion_technologies.boiler_industry import (
     BiomassBoilerIndustryCeramic,
     CoalBoilerIndustryCeramic,
@@ -35,16 +31,14 @@ from zen_europe.elements.conversion_technologies.industry_production import (
     CeramicProduction,
 )
 from zen_europe.elements.conversion_technologies.kiln_fuel_industry import (
-    ElectricityToKilnfuelCeramic,
-    HydrogenToKilnfuelCeramic,
-    NaturalGasToKilnfuelCeramic,
+    ElectricityToKilnFuelCeramic,
+    HydrogenToKilnFuelCeramic,
+    NaturalGasToKilnFuelCeramic,
 )
 from zen_europe.elements.retrofitting_technologies.industry_post_comb import (
     CeramicPostComb,
 )
-from zen_europe.elements.storage_technologies.industry_DSM import (
-    CeramicDSM,
-)
+from zen_europe.elements.storage_technologies.industry_DSM import CeramicDSM
 from zen_europe.elements.storage_technologies.industry_TES import (
     IndustryTESSteam150200Ceramic,
     IndustryTESWater0100Ceramic,
@@ -76,7 +70,7 @@ class CeramicSector(Sector):
             HeatIndustry0100Ceramic,
             HeatIndustry100150Ceramic,
             HeatIndustry150200Ceramic,
-            FuelToKilnCeramic,
+            KilnFuelCeramic,
             HeatPumpIndustry0100WasteHeatCeramic,
             HeatPumpIndustry0100WaterCeramic,
             HeatPumpIndustry100150WasteHeatCeramic,
@@ -91,9 +85,9 @@ class CeramicSector(Sector):
             WasteBoilerIndustryCeramic,
             HeatIndustryTempConversion150Ceramic,
             HeatIndustryTempConversion100Ceramic,
-            NaturalGasToKilnfuelCeramic,
-            HydrogenToKilnfuelCeramic,
-            ElectricityToKilnfuelCeramic,
+            NaturalGasToKilnFuelCeramic,
+            HydrogenToKilnFuelCeramic,
+            ElectricityToKilnFuelCeramic,
             IndustryTESWater0100Ceramic,
             IndustryTESWater100150Ceramic,
             IndustryTESSteam150200Ceramic,

@@ -278,7 +278,8 @@ class Aidres(Dataset[dict[str, pd.DataFrame]]):
         return self.data["glass"]["eu_production_share"]
 
     def get_conversion_factor_kiln_fuel(
-            self, element: ConversionTechnology) -> Attribute:
+        self, element: ConversionTechnology
+    ) -> Attribute:
         """Fuel input per kiln fuel, relative to the natural gas route."""
         return element.conversion_factor.set_data(
             default_value=[

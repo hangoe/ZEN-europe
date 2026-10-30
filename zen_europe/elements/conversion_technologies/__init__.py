@@ -99,12 +99,12 @@ from .industry_production import (
     PaperProduction,
 )
 from .kiln_fuel_industry import (
-    ElectricityToKilnfuelCeramic,
-    ElectricityToKilnfuelGlass,
-    HydrogenToKilnfuelCeramic,
-    HydrogenToKilnfuelGlass,
-    NaturalGasToKilnfuelCeramic,
-    NaturalGasToKilnfuelGlass,
+    ElectricityToKilnFuelCeramic,
+    ElectricityToKilnFuelGlass,
+    HydrogenToKilnFuelCeramic,
+    HydrogenToKilnFuelGlass,
+    NaturalGasToKilnFuelCeramic,
+    NaturalGasToKilnFuelGlass,
 )
 from .lignite_coal_plant import LigniteCoalPlant
 from .lng_terminal import LNGTerminal
@@ -252,12 +252,12 @@ __all__ = [
     "CeramicProduction",
     "PaperProduction",
     "FoodProduction",
-    "NaturalGasToKilnfuelGlass",
-    "NaturalGasToKilnfuelCeramic",
-    "HydrogenToKilnfuelGlass",
-    "HydrogenToKilnfuelCeramic",
-    "ElectricityToKilnfuelGlass",
-    "ElectricityToKilnfuelCeramic",
+    "NaturalGasToKilnFuelGlass",
+    "NaturalGasToKilnFuelCeramic",
+    "HydrogenToKilnFuelGlass",
+    "HydrogenToKilnFuelCeramic",
+    "ElectricityToKilnFuelGlass",
+    "ElectricityToKilnFuelCeramic",
     "HeatIndustryTempConversion150Glass",
     "HeatIndustryTempConversion150Ceramic",
     "HeatIndustryTempConversion150Paper",

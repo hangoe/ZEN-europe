@@ -1,3 +1,4 @@
+# TODO: Jacob decide how to model this. Should be one element per module.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar
@@ -9,24 +10,20 @@ from zen_creator.utils.attribute import Attribute
 from zen_europe.datasets.dataset_collections.industry_production_data import (
     IndustryProductionData,
 )
-from zen_europe.datasets.dataset_collections.technology_cost_database import (
-    TechnologyCostDatabase,
-)
-from zen_europe.datasets.datasets.technology.technology_diffusion_mannhardt import (
-    TechnologyDiffusionMannhardt,
+from zen_europe.elements.conversion_technologies.industry_heat_technology import (
+    IndustryHeatTechnology,
 )
 
 if TYPE_CHECKING:
     from zen_creator.model import Model
 
-# costs and diffusion of the same DEA capture unit as the cement kiln
-COST_PROXY = "cement_post_comb"
 
-
-class IndustryPostComb:
+class IndustryPostComb(IndustryHeatTechnology):
     """Post-combustion capture of a kiln's process CO2, as cement_post_comb."""
 
-    sector: ClassVar[str]
+    # costs and diffusion of the same DEA capture unit as the cement kiln
+    cost_proxy: ClassVar[str] = "cement_post_comb"
+    diffusion_proxy: ClassVar[str] = "cement_post_comb"
 
     def __init__(self, model: Model, power_unit: str = "tCO2/h"):
         super().__init__(model=model, power_unit=power_unit)
@@ -67,26 +64,10 @@ class IndustryPostComb:
         """Process emissions times the capture rate."""
         return self._data().get_retrofit_flow_coupling_factor(self)
 
-    def _set_lifetime(self) -> Attribute:
-        """Lifetime from DEA."""
-        return self._cost_db().get_lifetime(self, proxy_element_name=COST_PROXY)
-
     def _set_capex_specific_conversion(self) -> Attribute:
         """Investment cost from DEA."""
         return self._cost_db().get_capex_specific_conversion(
-            self, proxy_element_name=COST_PROXY
-        )
-
-    def _set_opex_specific_fixed(self) -> Attribute:
-        """Fixed O&M cost from DEA."""
-        return self._cost_db().get_opex_specific_fixed(
-            self, proxy_element_name=COST_PROXY
-        )
-
-    def _set_opex_specific_variable(self) -> Attribute:
-        """Variable O&M cost from DEA."""
-        return self._cost_db().get_opex_specific_variable(
-            self, proxy_element_name=COST_PROXY
+            self, proxy_element_name=self.cost_proxy
         )
 
     def _set_carbon_intensity_technology(self) -> Attribute:
@@ -106,20 +87,8 @@ class IndustryPostComb:
             source=AssumptionInformation(description="As cement_post_comb."),
         )
 
-    def _set_max_diffusion_rate(self) -> Attribute:
-        """As cement_post_comb."""
-        if not self.settings.investment.use_diffusion_rates:
-            return self.max_diffusion_rate
-        diffusion_rates = TechnologyDiffusionMannhardt(source_path=self.source_path)
-        return diffusion_rates.get_max_diffusion_rate(
-            self, proxy_element_name=COST_PROXY
-        )
-
     def _data(self) -> IndustryProductionData:
         return IndustryProductionData(self.settings, self.source_path)
-
-    def _cost_db(self) -> TechnologyCostDatabase:
-        return TechnologyCostDatabase(self.settings, self.source_path)
 
 
 class GlassPostComb(IndustryPostComb, RetrofittingTechnology):
@@ -130,5 +99,3 @@ class GlassPostComb(IndustryPostComb, RetrofittingTechnology):
 class CeramicPostComb(IndustryPostComb, RetrofittingTechnology):
     name: str = "ceramic_post_comb"
     sector: ClassVar[str] = "ceramic"
-
-# TODO: one module per technology (TBD with Christoph and Jacob)

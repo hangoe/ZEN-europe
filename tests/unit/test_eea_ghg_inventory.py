@@ -2,19 +2,15 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pandas as pd
 import pytest
-import yaml
 
 from zen_europe.datasets.datasets.energy_system.eea_ghg_inventory import (
     CHEMICALS_SECTORS,
     SECTOR_CODES,
     EEAGreenhouseGasInventory,
 )
-
-MODELS_PATH = Path(__file__).parents[2] / "data" / "models.yaml"
+from zen_europe.settings.structure import StructureSettings
 
 
 def _inventory(data: pd.DataFrame | None = None) -> EEAGreenhouseGasInventory:
@@ -26,8 +22,7 @@ def _inventory(data: pd.DataFrame | None = None) -> EEAGreenhouseGasInventory:
 
 
 def _default_sectors() -> list[str]:
-    models = yaml.safe_load(MODELS_PATH.read_text())
-    return models["defaults"]["settings"]["structure"]["set_sectors"]
+    return StructureSettings().set_sectors
 
 
 @pytest.mark.parametrize(
@@ -58,9 +53,7 @@ def test_no_code_nested_in_another(sectors: list[str]) -> None:
 
 
 def test_select_rejects_duplicate_codes() -> None:
-    index = pd.MultiIndex.from_tuples(
-        [("2.A", "DE")], names=["sector_code", "node"]
-    )
+    index = pd.MultiIndex.from_tuples([("2.A", "DE")], names=["sector_code", "node"])
     inventory = _inventory(pd.DataFrame({2022: [1.0]}, index=index))
     with pytest.raises(ValueError, match="duplicates"):
         inventory._select(["2.A", "2.A"], ["DE"])

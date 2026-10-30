@@ -17,14 +17,15 @@ if TYPE_CHECKING:
 
 class IndustryHeatTechnology:
     """
-    Data shared by the industrial boilers and heat pumps: costs, lifetime and
-    construction time of a DEA proxy, diffusion as a district heating technology.
+    Data shared by the industrial boilers, heat pumps and post-combustion capture:
+    costs, lifetime and construction time of a DEA proxy, diffusion as a proxy
+    technology.
     """
 
     sector: ClassVar[str]
     # DEA technology the costs, lifetime and construction time are taken from
     cost_proxy: ClassVar[str]
-    # district heating technology the diffusion rate is taken from
+    # technology the diffusion rate is taken from
     diffusion_proxy: ClassVar[str]
 
     def __init__(self, model: Model, power_unit: str = "MW"):

@@ -22,9 +22,7 @@ from zen_europe.elements.retrofitting_technologies.industry_post_comb import (
 from zen_europe.elements.retrofitting_technologies.waste_to_cement_fuel import (
     WasteToCementFuel,
 )
-from zen_europe.elements.storage_technologies.industry_DSM import (
-    ClinkerDSM,
-)
+from zen_europe.elements.storage_technologies.industry_DSM import ClinkerDSM
 
 
 class CementSector(Sector):

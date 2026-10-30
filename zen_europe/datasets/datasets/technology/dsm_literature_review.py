@@ -10,6 +10,7 @@ from zen_creator.datasets.datasets.metadata import AssumptionInformation, MetaDa
 from zen_creator.utils.attribute import Attribute
 
 from zen_europe.utils.constants import Constants
+from zen_europe.utils.industry import model_nodes
 
 if TYPE_CHECKING:
     from zen_europe.elements.storage_technologies.industry_DSM import IndustryDSM
@@ -91,7 +92,7 @@ class DSMLiteratureReview(Dataset[dict[str, pd.DataFrame]]):
         """Stock limited to the product's demand, 0 at nodes without demand."""
         demand = element.model.elements[element.carrier].demand.df
         demand = demand if demand.ndim == 1 else demand.iloc[:, 0]
-        nodes = list(element.model.config.system.set_nodes)
+        nodes = list(model_nodes(element))
         nodes += [node for node in demand.index if node not in nodes]
         limit = (
             demand.reindex(pd.Index(nodes, name=demand.index.name))

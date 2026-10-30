@@ -1,5 +1,7 @@
 """Unit tests for the datasets and collections of the industry heat sectors."""
 
+# TODO: check with Christoph whether this test file can be removed.
+
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -87,13 +89,13 @@ def test_kiln_fuel_only_for_glass_and_ceramic(
     production: IndustryProductionData,
 ) -> None:
     glass = production.calculate_fuel_intensity("glass").index
-    assert "fuel_to_kiln_glass" in glass and "natural_gas" not in glass
+    assert "kiln_fuel_glass" in glass and "natural_gas" not in glass
     # 2.6 % of the ceramic kiln gas cannot switch fuel
     ceramic = production.calculate_fuel_intensity("ceramic").index
-    assert {"fuel_to_kiln_ceramic", "natural_gas"} <= set(ceramic)
+    assert {"kiln_fuel_ceramic", "natural_gas"} <= set(ceramic)
     for sector in ("paper", "food"):
         assert not any(
-            c.startswith("fuel_to_kiln")
+            c.startswith("kiln_fuel")
             for c in production.calculate_fuel_intensity(sector).index
         )
 
@@ -146,9 +148,7 @@ def test_kiln_fuel_capacity_matches_demand(
 ) -> None:
     """Existing kiln natural gas capacity and kiln fuel limit share one basis."""
     for sector in ("glass", "ceramic"):
-        intensity = production.calculate_fuel_intensity(sector)[
-            f"fuel_to_kiln_{sector}"
-        ]
+        intensity = production.calculate_fuel_intensity(sector)[f"kiln_fuel_{sector}"]
         assert (
             production.calculate_production(sector, NODES) * intensity
         ).to_numpy() == pytest.approx(
@@ -282,6 +282,3 @@ def test_tes_self_discharge_brown2018() -> None:
     assert Brown2018.hourly_self_discharge(180) == pytest.approx(2.315e-4, rel=1e-3)
     assert Brown2018.hourly_self_discharge(3) == pytest.approx(0.013793, rel=1e-4)
     assert Brown2018.hourly_self_discharge(20 / 24) == pytest.approx(0.0488, rel=1e-3)
-
-
-# TODO: this can probably be removed -> check with Christoph
